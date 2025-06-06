@@ -1,23 +1,20 @@
 import tweepy
 import os
-import random
 
-print("🔧 Starting tweet script...")
+def tweet_hello():
+    api_key = os.getenv("TWITTER_API_KEY")
+    api_secret = os.getenv("TWITTER_API_SECRET")
+    access_token = os.getenv("TWITTER_ACCESS_TOKEN")
+    access_secret = os.getenv("TWITTER_ACCESS_SECRET")
 
-# Authenticate with environment variables from GitHub Secrets
-auth = tweepy.OAuth1UserHandler(
-    os.getenv("TWITTER_API_KEY"),
-    os.getenv("TWITTER_API_SECRET"),
-    os.getenv("TWITTER_ACCESS_TOKEN"),
-    os.getenv("TWITTER_ACCESS_SECRET")
-)
+    auth = tweepy.OAuth1UserHandler(api_key, api_secret, access_token, access_secret)
+    api = tweepy.API(auth)
 
-api = tweepy.API(auth)
+    try:
+        api.update_status("Hello from GitHub Actions!")
+        print("✅ Tweet posted successfully!")
+    except Exception as e:
+        print("❌ Error posting tweet:", e)
 
-try:
-    tweet = "🚀 Auto Tweet Test from GitHub! #" + str(random.randint(1000, 9999))
-    print("📢 Tweet content:", tweet)
-    api.update_status(tweet)
-    print("✅ Tweet posted successfully.")
-except Exception as e:
-    print("❌ Failed to post tweet:", str(e))
+if __name__ == "__main__":
+    tweet_hello()
