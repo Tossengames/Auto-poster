@@ -1,19 +1,22 @@
-import os
-import tweepy
+import { TwitterApi } from 'twitter-api-v2';
 
-def main():
-    # Get Twitter API keys from environment variables
-    api_key = os.getenv('TWITTER_API_KEY')
-    api_secret = os.getenv('TWITTER_API_SECRET')
-    access_token = os.getenv('TWITTER_ACCESS_TOKEN')
-    access_secret = os.getenv('TWITTER_ACCESS_SECRET')
+async function main() {
+  const client = new TwitterApi({
+    appKey: process.env.TWITTER_API_KEY,
+    appSecret: process.env.TWITTER_API_SECRET,
+    accessToken: process.env.TWITTER_ACCESS_TOKEN,
+    accessSecret: process.env.TWITTER_ACCESS_SECRET,
+  });
 
-    # Authenticate to Twitter
-    auth = tweepy.OAuth1UserHandler(api_key, api_secret, access_token, access_secret)
-    api = tweepy.API(auth)
+  const rwClient = client.readWrite;
 
-    # Post a tweet
-    api.update_status("Hello from GitHub Actions! 🚀")
+  try {
+    await rwClient.v2.tweet('Hello from GitHub Actions using Node.js!');
+    console.log('Tweet posted successfully!');
+  } catch (error) {
+    console.error('Error posting tweet:', error);
+    process.exit(1);
+  }
+}
 
-if __name__ == "__main__":
-    main()
+main();
