@@ -1,15 +1,16 @@
 name: Tweet Sports News
 
 on:
+  workflow_dispatch:     # Enables manual run
   schedule:
-    - cron: "0 */8 * * *"  # every 8 hours
-  workflow_dispatch:       # allows manual run
+    - cron: "0 */8 * * *"  # Optional: Runs every 8 hours
 
 jobs:
   tweet:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -20,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: pip install tweepy feedparser
 
-      - name: Run tweet script
+      - name: Run script
         env:
           TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
           TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
