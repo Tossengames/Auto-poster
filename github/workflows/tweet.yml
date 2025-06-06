@@ -1,0 +1,55 @@
+name: Post to Twitter
+
+on:
+  schedule:
+    - cron: '0 8,16,23 * * *'  # At 8 AM, 4 PM, and 11 PM UTC
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  tweet:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install tweepy
+
+      - name: Run tweet script
+        env:
+          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
+          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
+        run: |
+          echo "from tweepy import OAuth1UserHandler, API
+import random
+
+# Twitter Auth
+auth = OAuth1UserHandler(
+    '${{ secrets.TWITTER_API_KEY }}',
+    '${{ secrets.TWITTER_API_SECRET }}',
+    '${{ secrets.TWITTER_ACCESS_TOKEN }}',
+    '${{ secrets.TWITTER_ACCESS_SECRET }}'
+)
+api = API(auth)
+
+# Example tweets (replace with your own sports news fetcher later)
+tweets = [
+    '⚽ Breaking: Messi scores again! #Football #Messi',
+    '🏀 NBA playoffs heating up! #NBA #Basketball',
+    '🎾 Wimbledon updates rolling in! #Tennis #Wimbledon',
+    '🏆 Top 5 goals of the week! #FootballNews',
+    '🔥 Sports roundup of the day! #Sports #News'
+]
+
+# Post a random tweet
+api.update_status(status=random.choice(tweets))
+print('Tweet posted!')
+" > tweet.py
+          python tweet.py
