@@ -1,15 +1,13 @@
 name: Auto Tweet
 
 on:
-  workflow_dispatch:
-  schedule:
-    - cron: '0 * * * *' # Runs every hour
+  workflow_dispatch:  # allows manual run from GitHub UI
 
 jobs:
   tweet:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -17,7 +15,7 @@ jobs:
         with:
           python-version: 3.10
 
-      - name: Install tweepy
+      - name: Install Tweepy
         run: pip install tweepy
 
       - name: Run tweet script
