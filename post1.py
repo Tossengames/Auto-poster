@@ -21,15 +21,13 @@ TWITTER_ACCESS_TOKEN = os.environ.get('TWITTER_ACCESS_TOKEN')
 TWITTER_ACCESS_TOKEN_SECRET = os.environ.get('TWITTER_ACCESS_TOKEN_SECRET')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 
-# Expanded RSS Feeds - Tech + Game Dev
+# Curated RSS Feeds - Only quality sources
 TECH_RSS_FEEDS = [
     'https://techcrunch.com/feed',
     'https://www.wired.com/feed/rss',
     'https://arstechnica.com/feed',
-    'https://venturebeat.com/feed',
     'https://www.theverge.com/rss/index.xml',
-    'https://feeds.mashable.com/mashable/tech',
-    'https://www.digitaltrends.com/feed'
+    'https://feeds.mashable.com/mashable/tech'
 ]
 
 GAME_DEV_RSS_FEEDS = [
@@ -37,11 +35,74 @@ GAME_DEV_RSS_FEEDS = [
     'https://80.lv/feed/',
     'https://www.gamedeveloper.com/rss',
     'https://www.gamesindustry.biz/feed',
-    'https://videogamemarketing.com/feed/',
-    'https://www.indiedb.com/engine/unity/feed',
-    'https://www.rockpapershotgun.com/feed',
-    'https://kotaku.com/rss'
+    'https://www.rockpapershotgun.com/feed'
 ]
+
+# Promotional keywords to filter out
+PROMOTIONAL_KEYWORDS = [
+    'discount', 'sale', 'coupon', 'promo', 'deal', 'offer', 'limited time',
+    'buy now', 'shop', 'store', 'price drop', 'save', 'percent off',
+    'exclusive offer', 'special offer', 'flash sale', 'black friday',
+    'cyber monday', 'sponsored', 'advertisement', 'affiliate', 'partner',
+    'promotion', 'bundle', 'free trial', 'subscribe', 'sign up', 'get started'
+]
+
+# ================================
+# CONTENT FILTERING FUNCTIONS
+# ================================
+
+def is_promotional_content(article):
+    """Check if article contains promotional content"""
+    title = article.get('title', '').lower()
+    summary = article.get('summary', '').lower()
+    
+    # Check for promotional keywords
+    for keyword in PROMOTIONAL_KEYWORDS:
+        if keyword in title or keyword in summary:
+            print(f"🚫 Filtered out promotional content: {keyword}")
+            return True
+    
+    # Check for sponsored indicators
+    if 'sponsored' in title or 'sponsored' in summary:
+        print(f"🚫 Filtered out sponsored content")
+        return True
+    
+    # Check for sales/discount language
+    if any(word in title for word in ['% off', '$', '€', '£']):
+        print(f"🚫 Filtered out price/discount content")
+        return True
+    
+    return False
+
+def is_quality_content(article):
+    """Check if article is genuine tech/game dev content"""
+    title = article.get('title', '').lower()
+    
+    # Positive indicators of quality content
+    quality_indicators = [
+        'analysis', 'review', 'guide', 'tutorial', 'news', 'update',
+        'release', 'development', 'design', 'programming', 'engine',
+        'studio', 'developer', 'industry', 'trend', 'future', 'ai',
+        'technology', 'innovation', 'research', 'study', 'report',
+        'interview', 'behind the scenes', 'post-mortem', 'case study'
+    ]
+    
+    # Count quality indicators
+    quality_score = sum(1 for indicator in quality_indicators if indicator in title)
+    return quality_score > 0
+
+def filter_articles(articles):
+    """Filter out promotional and low-quality articles"""
+    filtered_articles = []
+    
+    for article in articles:
+        if not is_promotional_content(article) and is_quality_content(article):
+            filtered_articles.append(article)
+        else:
+            print(f"🚫 Filtered out: {article['title'][:60]}...")
+    
+    print(f"✅ Filtered {len(articles)} -> {len(filtered_articles)} quality articles")
+    return filtered_articles
 
 # ================================
 # TWITTER/X API FUNCTIONS
@@ -119,28 +180,34 @@ def post_to_twitter(content, api_key, api_secret, access_token, access_token_sec
 # ================================
 
 def fetch_tech_news_from_rss():
-    """Fetch current tech news from RSS feeds - RANDOM SELECTION"""
+    """Fetch current tech news from RSS feeds - WITH FILTERING"""
     try:
         print("📰 Fetching latest tech news...")
         articles = fetch_news_from_feeds(TECH_RSS_FEEDS, "tech")
         
-        random.shuffle(articles)
-        print(f"🎲 Randomly selected from {len(articles)} tech articles")
-        return articles
+        # Filter out promotional content
+        filtered_articles = filter_articles(articles)
+        
+        random.shuffle(filtered_articles)
+        print(f"🎲 Randomly selected from {len(filtered_articles)} quality tech articles")
+        return filtered_articles
         
     except Exception as e:
         print(f"❌ Tech RSS fetch error: {e}")
         return []
 
 def fetch_game_dev_news_from_rss():
-    """Fetch current game development news from RSS feeds - RANDOM SELECTION"""
+    """Fetch current game development news from RSS feeds - WITH FILTERING"""
     try:
         print("🎮 Fetching latest game dev news...")
         articles = fetch_news_from_feeds(GAME_DEV_RSS_FEEDS, "game dev")
         
-        random.shuffle(articles)
-        print(f"🎲 Randomly selected from {len(articles)} game dev articles")
-        return articles
+        # Filter out promotional content
+        filtered_articles = filter_articles(articles)
+        
+        random.shuffle(filtered_articles)
+        print(f"🎲 Randomly selected from {len(filtered_articles)} quality game dev articles")
+        return filtered_articles
         
     except Exception as e:
         print(f"❌ Game dev RSS fetch error: {e}")
@@ -157,7 +224,7 @@ def fetch_news_from_feeds(feed_list, category):
             if not feed.entries:
                 continue
             
-            for entry in feed.entries[:3]:
+            for entry in feed.entries[:5]:  # Get more entries to filter from
                 article_date = None
                 if hasattr(entry, 'published_parsed') and entry.published_parsed:
                     article_date = datetime(*entry.published_parsed[:6])
@@ -249,6 +316,8 @@ def generate_hashtags(topic, content_type):
     prompt = f"""
     Generate 3-4 highly relevant, popular hashtags for a {content_type} post about: {topic}
     
+    Focus on genuine tech/game dev content, not promotions.
+    
     Requirements:
     - Mix popular and niche hashtags
     - Include trending hashtags when relevant
@@ -258,9 +327,9 @@ def generate_hashtags(topic, content_type):
     
     Examples for tech: #AI #Tech #Innovation #FutureTech
     Examples for gaming: #GameDev #IndieDev #Gaming #Unity
-    Examples for trends: #Trending #TechNews #Future
+    Examples for trends: #TechNews #Future #DigitalTrends
     
-    Make them feel current and relevant.
+    Make them feel current and relevant to genuine content.
     """
     
     try:
@@ -288,14 +357,14 @@ def generate_hashtags(topic, content_type):
     elif content_type == 'game dev':
         return "#GameDev #IndieDev #Gaming #DevLife"
     else:
-        return "#Trending #Tech #Insights"
+        return "#TechNews #Trends #Insights"
 
 def generate_tech_analysis_post(articles):
-    """Generate sophisticated tech analysis post"""
+    """Generate sophisticated tech analysis post - ONLY QUALITY CONTENT"""
     if not articles:
         return create_fallback_post('tech'), None
     
-    # RANDOM SELECTION: Pick 1-2 random articles
+    # RANDOM SELECTION: Pick from filtered quality articles
     selected_articles = random.sample(articles, min(2, len(articles)))
     main_topic = selected_articles[0]['title']
     
@@ -307,9 +376,12 @@ def generate_tech_analysis_post(articles):
             break
     
     prompt = f"""
-    Create a SHORT, engaging Twitter post about tech trends. MAX 150 characters for main content.
+    Create a SHORT, engaging Twitter post about genuine tech trends and analysis. MAX 150 characters for main content.
 
     Topic: {main_topic}
+
+    IMPORTANT: Focus on analysis, insights, and genuine tech discussion. 
+    DO NOT mention promotions, discounts, sales, or commercial offers.
 
     Writing style:
     - Sound like a smart, witty tech enthusiast
@@ -318,15 +390,12 @@ def generate_tech_analysis_post(articles):
     - Be insightful but conversational
     - Sound human and authentic
     - Keep it strategic but fun
+    - Focus on technology, innovation, and industry insights
 
     Structure:
-    - Start with an interesting observation
+    - Start with an interesting observation about the technology
     - Add strategic insight with personality
-    - End with engaging question/thought
-
-    Examples:
-    "AI is getting so smart, soon it'll be giving US performance reviews 😅 But seriously, this changes everything about how we work. Wild times ahead! 🤖"
-    "Another day, another 'revolutionary' tech launch 🚀 This one actually has some interesting strategic implications though... Your take?"
+    - End with engaging question/thought about the tech
 
     Return ONLY the post text (without hashtags).
     """
@@ -335,11 +404,11 @@ def generate_tech_analysis_post(articles):
     return post_text, image_url
 
 def generate_game_dev_post(articles):
-    """Generate sophisticated game development post"""
+    """Generate sophisticated game development post - ONLY QUALITY CONTENT"""
     if not articles:
         return create_fallback_post('game dev'), None
     
-    # RANDOM SELECTION: Pick 1-2 random articles
+    # RANDOM SELECTION: Pick from filtered quality articles
     selected_articles = random.sample(articles, min(2, len(articles)))
     main_topic = selected_articles[0]['title']
     
@@ -351,9 +420,12 @@ def generate_game_dev_post(articles):
             break
     
     prompt = f"""
-    Create a SHORT, engaging Twitter post about game development. MAX 150 characters for main content.
+    Create a SHORT, engaging Twitter post about genuine game development insights. MAX 150 characters for main content.
 
     Topic: {main_topic}
+
+    IMPORTANT: Focus on game development, design insights, industry trends, and development challenges.
+    DO NOT mention game sales, discounts, promotions, or commercial offers.
 
     Writing style:
     - Sound like a passionate game developer/enthusiast
@@ -362,15 +434,12 @@ def generate_game_dev_post(articles):
     - Be insightful but conversational
     - Sound human and authentic
     - Mix strategic thinking with dev humor
+    - Focus on development, design, and industry insights
 
     Structure:
-    - Start with an interesting observation
+    - Start with an interesting observation about game development
     - Add industry insight with personality
-    - End with engaging question/thought
-
-    Examples:
-    "Another 'game-changing' engine update? 🎮 Let's see if it actually helps indie devs or just adds more complexity 😂 Thoughts?"
-    "Player expectations are evolving faster than my ability to fix bugs 🐛 But this shift towards community-driven games is fascinating!"
+    - End with engaging question/thought about game dev
 
     Return ONLY the post text (without hashtags).
     """
@@ -386,9 +455,12 @@ def generate_trending_topic_post(trends):
     main_topic = trends[0]
     
     prompt = f"""
-    Create a SHORT, engaging Twitter post about trending topics. MAX 150 characters for main content.
+    Create a SHORT, engaging Twitter post about genuine trending topics in tech/gaming. MAX 150 characters for main content.
 
     Topic: {main_topic}
+
+    IMPORTANT: Focus on analysis and insights about the trend.
+    DO NOT mention promotions, sales, or commercial aspects.
 
     Writing style:
     - Sound like a curious, witty observer
@@ -402,10 +474,6 @@ def generate_trending_topic_post(trends):
     - Start with an interesting observation about the trend
     - Add strategic insight with personality
     - End with engaging question/thought
-
-    Examples:
-    "Everyone's talking about this trend... and I can see why! 🤔 There's some real strategic gold here if you look closely. What's your read?"
-    "Another day, another viral trend taking over my timeline 😅 But this one actually has some interesting implications. Your thoughts?"
 
     Return ONLY the post text (without hashtags).
     """
@@ -422,9 +490,12 @@ def generate_trend_based_opinion_poll(trends):
     poll_topic = random.choice(trends[:5])
     
     prompt = f"""
-    Create a SHORT, engaging Twitter opinion poll. MAX 180 characters TOTAL.
+    Create a SHORT, engaging Twitter opinion poll about genuine tech/gaming topics. MAX 180 characters TOTAL.
 
     Topic: {poll_topic}
+
+    IMPORTANT: Focus on strategic decisions, development approaches, or industry perspectives.
+    DO NOT mention commercial aspects, purchases, or promotions.
 
     Writing style:
     - Sound like a curious, engaging community member
@@ -432,18 +503,13 @@ def generate_trend_based_opinion_poll(trends):
     - Use 1-2 relevant emojis
     - Make it conversational and fun
     - Keep options clear but interesting
+    - Focus on development strategies, design choices, or industry perspectives
 
     Format:
-    [Engaging question with personality - max 100 chars]
-    A: [Fun option 1 - max 25 chars]
-    B: [Fun option 2 - max 25 chars]
+    [Engaging question about strategy/development - max 100 chars]
+    A: [Strategic option 1 - max 25 chars]
+    B: [Strategic option 2 - max 25 chars]
     [Brief engaging call to vote]
-
-    Examples:
-    "Strategic dilemma time! 🧐 For this trend, which approach wins?
-    A: Go all in, YOLO style 🚀
-    B: Wait and see, play it safe 🛡️
-    Vote below! 👇"
 
     Return the complete post text (without additional hashtags).
     """
@@ -599,8 +665,8 @@ def select_post_type():
 def main():
     print("🐦 Strategic Content Analyst - Twitter Edition")
     print("=" * 50)
-    print("📰 Multi-Source Intelligence • AI-Powered Posts")
-    print("🎮 Human Personality • Smart & Witty")
+    print("📰 QUALITY CONTENT ONLY • NO PROMOTIONS")
+    print("🎮 Genuine Tech/Game Dev Insights")
     print("=" * 50)
     
     # Validate configuration
@@ -658,8 +724,8 @@ def main():
         print("\n✅ Strategic content successfully deployed!")
         print(f"🎯 Post type: {post_type.replace('_', ' ').title()}")
         print(f"🖼️ Image included: {'Yes' if image_url else 'No'}")
-        print("🤖 AI-powered personality")
-        print("😄 Human-like & engaging")
+        print("🚫 PROMOTIONAL CONTENT FILTERED OUT")
+        print("🎯 GENUINE TECH/GAME DEV INSIGHTS ONLY")
     else:
         print("\n❌ Deployment failed.")
 
