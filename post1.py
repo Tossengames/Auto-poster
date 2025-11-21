@@ -43,13 +43,6 @@ GAME_DEV_RSS_FEEDS = [
     'https://kotaku.com/rss'
 ]
 
-# Strategic Hashtags (shorter for Twitter)
-STRATEGIC_HASHTAGS = [
-    "#Strategy", "#Tech", "#GameDev",
-    "#Trends", "#Innovation", "#Leadership",
-    "#Poll", "#Debate", "#Thoughts"
-]
-
 # ================================
 # TWITTER/X API FUNCTIONS
 # ================================
@@ -93,7 +86,6 @@ def post_to_twitter(content, api_key, api_secret, access_token, access_token_sec
             print(f"✅ Media uploaded successfully! ID: {media.media_id_string}")
         
         # --- CREATE TWEET (using v2) ---
-        # This is the crucial change: use tweepy.Client for v2
         client_v2 = tweepy.Client(
             consumer_key=api_key,
             consumer_secret=api_secret,
@@ -132,7 +124,6 @@ def fetch_tech_news_from_rss():
         print("📰 Fetching latest tech news...")
         articles = fetch_news_from_feeds(TECH_RSS_FEEDS, "tech")
         
-        # RANDOM SELECTION: Shuffle articles and pick random ones
         random.shuffle(articles)
         print(f"🎲 Randomly selected from {len(articles)} tech articles")
         return articles
@@ -147,7 +138,6 @@ def fetch_game_dev_news_from_rss():
         print("🎮 Fetching latest game dev news...")
         articles = fetch_news_from_feeds(GAME_DEV_RSS_FEEDS, "game dev")
         
-        # RANDOM SELECTION: Shuffle articles and pick random ones
         random.shuffle(articles)
         print(f"🎲 Randomly selected from {len(articles)} game dev articles")
         return articles
@@ -254,22 +244,23 @@ def get_google_trends_topics():
         print(f"❌ Google Trends error: {e}")
         return ['AI technology', 'gaming trends', 'tech innovation']
 
-def generate_strategic_cta(topic, content_type):
-    """Generate AI-powered strategic CTA"""
+def generate_hashtags(topic, content_type):
+    """Generate relevant hashtags using AI"""
     prompt = f"""
-    Create a strategic call-to-action for a Twitter post about {topic}.
+    Generate 3-4 highly relevant, popular hashtags for a {content_type} post about: {topic}
     
     Requirements:
-    - Sound like a strategist challenging conventional thinking
-    - Pose a thought-provoking question
-    - Keep it under 40 characters
+    - Mix popular and niche hashtags
+    - Include trending hashtags when relevant
+    - Focus on {content_type} space (tech, gaming, indie dev, etc.)
+    - Keep them short and effective
+    - Return ONLY the hashtags as: #First #Second #Third
     
-    Examples:
-    "Your strategic take?"
-    "Patterns emerging. Your view?"
-    "Strategic implications?"
+    Examples for tech: #AI #Tech #Innovation #FutureTech
+    Examples for gaming: #GameDev #IndieDev #Gaming #Unity
+    Examples for trends: #Trending #TechNews #Future
     
-    Return ONLY the CTA text.
+    Make them feel current and relevant.
     """
     
     try:
@@ -284,18 +275,20 @@ def generate_strategic_cta(topic, content_type):
         if response.status_code == 200:
             data = response.json()
             if "candidates" in data and data["candidates"]:
-                cta = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                cta = cta.replace('```', '').strip()
-                cta = remove_ai_indicators(cta)
-                if len(cta) > 40:
-                    cta = cta[:37] + "..."
-                print(f"🎯 AI-generated CTA: {cta}")
-                return cta
+                hashtags = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                hashtags = hashtags.replace('```', '').strip()
+                print(f"🏷️ AI-generated hashtags: {hashtags}")
+                return hashtags
     except Exception as e:
-        print(f"❌ CTA generation error: {e}")
+        print(f"❌ Hashtag generation error: {e}")
     
-    # Fallback CTA
-    return "Your strategic take?"
+    # Fallback hashtags
+    if content_type == 'tech':
+        return "#Tech #AI #Innovation #Future"
+    elif content_type == 'game dev':
+        return "#GameDev #IndieDev #Gaming #DevLife"
+    else:
+        return "#Trending #Tech #Insights"
 
 def generate_tech_analysis_post(articles):
     """Generate sophisticated tech analysis post"""
@@ -314,18 +307,28 @@ def generate_tech_analysis_post(articles):
             break
     
     prompt = f"""
-    Create a SHORT Twitter post analyzing tech trends. MAX 120 characters for main content.
+    Create a SHORT, engaging Twitter post about tech trends. MAX 150 characters for main content.
 
     Topic: {main_topic}
 
-    Style: Strategic, insightful, concise
-    - One sharp observation
-    - Strategic implication
-    - Leave space for CTA and hashtags
+    Writing style:
+    - Sound like a smart, witty tech enthusiast
+    - Add subtle humor and personality
+    - Use 1-2 relevant emojis naturally
+    - Be insightful but conversational
+    - Sound human and authentic
+    - Keep it strategic but fun
 
-    Total target: 120 chars for main text + 40 for CTA + 20 for hashtags = 180 total
+    Structure:
+    - Start with an interesting observation
+    - Add strategic insight with personality
+    - End with engaging question/thought
 
-    Return ONLY the post text (without CTA or hashtags).
+    Examples:
+    "AI is getting so smart, soon it'll be giving US performance reviews 😅 But seriously, this changes everything about how we work. Wild times ahead! 🤖"
+    "Another day, another 'revolutionary' tech launch 🚀 This one actually has some interesting strategic implications though... Your take?"
+
+    Return ONLY the post text (without hashtags).
     """
     
     post_text = generate_ai_content(prompt, selected_articles, 'tech', main_topic)
@@ -348,18 +351,28 @@ def generate_game_dev_post(articles):
             break
     
     prompt = f"""
-    Create a SHORT Twitter post about game dev trends. MAX 120 characters for main content.
+    Create a SHORT, engaging Twitter post about game development. MAX 150 characters for main content.
 
     Topic: {main_topic}
 
-    Style: Strategic, industry-focused, concise
-    - One key insight
-    - Industry implication  
-    - Leave space for CTA and hashtags
+    Writing style:
+    - Sound like a passionate game developer/enthusiast
+    - Add gaming humor and personality
+    - Use 1-2 gaming-related emojis
+    - Be insightful but conversational
+    - Sound human and authentic
+    - Mix strategic thinking with dev humor
 
-    Total target: 120 chars for main text + 40 for CTA + 20 for hashtags = 180 total
+    Structure:
+    - Start with an interesting observation
+    - Add industry insight with personality
+    - End with engaging question/thought
 
-    Return ONLY the post text (without CTA or hashtags).
+    Examples:
+    "Another 'game-changing' engine update? 🎮 Let's see if it actually helps indie devs or just adds more complexity 😂 Thoughts?"
+    "Player expectations are evolving faster than my ability to fix bugs 🐛 But this shift towards community-driven games is fascinating!"
+
+    Return ONLY the post text (without hashtags).
     """
     
     post_text = generate_ai_content(prompt, selected_articles, 'game dev', main_topic)
@@ -373,18 +386,28 @@ def generate_trending_topic_post(trends):
     main_topic = trends[0]
     
     prompt = f"""
-    Create a SHORT Twitter post about trending topics. MAX 120 characters for main content.
+    Create a SHORT, engaging Twitter post about trending topics. MAX 150 characters for main content.
 
     Topic: {main_topic}
 
-    Style: Analytical, insightful, concise
-    - Why this trends matters
-    - Strategic perspective
-    - Leave space for CTA and hashtags
+    Writing style:
+    - Sound like a curious, witty observer
+    - Add subtle humor about trends
+    - Use 1-2 relevant emojis
+    - Be insightful but conversational
+    - Sound human and authentic
+    - Mix trend analysis with personality
 
-    Total target: 120 chars for main text + 40 for CTA + 20 for hashtags = 180 total
+    Structure:
+    - Start with an interesting observation about the trend
+    - Add strategic insight with personality
+    - End with engaging question/thought
 
-    Return ONLY the post text (without CTA or hashtags).
+    Examples:
+    "Everyone's talking about this trend... and I can see why! 🤔 There's some real strategic gold here if you look closely. What's your read?"
+    "Another day, another viral trend taking over my timeline 😅 But this one actually has some interesting implications. Your thoughts?"
+
+    Return ONLY the post text (without hashtags).
     """
     
     post_text = generate_ai_content(prompt, trends, 'trending', main_topic)
@@ -399,20 +422,30 @@ def generate_trend_based_opinion_poll(trends):
     poll_topic = random.choice(trends[:5])
     
     prompt = f"""
-    Create a SHORT Twitter opinion poll. MAX 160 characters TOTAL including options.
+    Create a SHORT, engaging Twitter opinion poll. MAX 180 characters TOTAL.
 
     Topic: {poll_topic}
 
+    Writing style:
+    - Sound like a curious, engaging community member
+    - Add personality and subtle humor
+    - Use 1-2 relevant emojis
+    - Make it conversational and fun
+    - Keep options clear but interesting
+
     Format:
-    [Question about strategic approach - max 80 chars]
-    A: [Option 1 - max 20 chars]
-    B: [Option 2 - max 20 chars]
-    [Space for hashtags]
+    [Engaging question with personality - max 100 chars]
+    A: [Fun option 1 - max 25 chars]
+    B: [Fun option 2 - max 25 chars]
+    [Brief engaging call to vote]
 
-    Keep entire post under 160 characters.
-    Make options clear and contrasting.
+    Examples:
+    "Strategic dilemma time! 🧐 For this trend, which approach wins?
+    A: Go all in, YOLO style 🚀
+    B: Wait and see, play it safe 🛡️
+    Vote below! 👇"
 
-    Return the complete post text.
+    Return the complete post text (without additional hashtags).
     """
     
     try:
@@ -434,13 +467,11 @@ def generate_trend_based_opinion_poll(trends):
                 post_text = remove_ai_indicators(post_text)
                 
                 # Ensure it's short enough
-                if len(post_text) > 160:
-                    # Truncate but keep the structure
+                if len(post_text) > 180:
                     lines = post_text.split('\n')
                     if len(lines) >= 3:
-                        # Shorten the question line
-                        lines[0] = lines[0][:70] + "..." if len(lines[0]) > 70 else lines[0]
-                        post_text = '\n'.join(lines[:3])  # Keep only question and 2 options
+                        lines[0] = lines[0][:90] + "..." if len(lines[0]) > 90 else lines[0]
+                        post_text = '\n'.join(lines[:4])
                 
                 print(f"✅ Opinion poll created ({len(post_text)} chars)")
                 return post_text
@@ -453,7 +484,7 @@ def generate_trend_based_opinion_poll(trends):
     return create_opinion_fallback(poll_topic)
 
 def generate_ai_content(prompt, content, content_type, main_topic):
-    """Generate content using AI and add AI-powered CTA"""
+    """Generate content using AI and add AI-powered hashtags"""
     try:
         print(f"🎭 Generating {content_type} post...")
         
@@ -471,15 +502,9 @@ def generate_ai_content(prompt, content, content_type, main_topic):
                 post_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                 post_text = post_text.replace('```', '').strip()
                 
-                # For non-poll posts, add CTA and hashtags
-                if content_type != 'opinion_poll':
-                    # Add AI-generated CTA
-                    cta = generate_strategic_cta(main_topic, content_type)
-                    post_text += f" {cta}"
-                    
-                    # Add hashtags (fewer for Twitter)
-                    selected_hashtags = random.sample(STRATEGIC_HASHTAGS, 2)
-                    post_text += f" {' '.join(selected_hashtags)}"
+                # Add AI-generated hashtags for all post types
+                hashtags = generate_hashtags(main_topic, content_type)
+                post_text += f" {hashtags}"
                 
                 post_text = remove_ai_indicators(post_text)
                 
@@ -502,7 +527,7 @@ def remove_ai_indicators(text):
     ai_phrases = [
         "as an AI", "according to AI", "AI-generated", "language model",
         "based on the provided", "in this content", "the writer",
-        "this analysis", "the author", "in this piece"
+        "this analysis", "the author", "in this piece", "according to the"
     ]
     
     for phrase in ai_phrases:
@@ -513,28 +538,27 @@ def remove_ai_indicators(text):
 
 def create_fallback_post(content_type):
     """Create sophisticated fallback posts"""
+    emojis = ["🚀", "🤔", "💡", "🎯", "🔥", "👀", "💭", "⚡"]
+    
     if content_type == 'tech':
         fallbacks = [
-            "Tech shifts reveal strategic patterns. Forward-thinkers adapt.",
-            "Innovation cycles accelerate. Strategic positioning matters.",
+            f"Tech moves fast but patterns emerge {random.choice(emojis)} This shift changes everything for builders. Wild times ahead!",
+            f"Another 'revolutionary' launch {random.choice(emojis)} But this one actually has legs. Strategic implications are huge!"
         ]
     elif content_type == 'game dev':
         fallbacks = [
-            "Game industry evolves. Community beats graphics.",
-            "Player expectations shift. Engagement is key.",
+            f"Game dev never slows down {random.choice(emojis)} This evolution in player expectations is fascinating! Community over graphics?",
+            f"Indie dev life: fixing bugs while trends shift {random.choice(emojis)} But this change actually makes sense long-term!"
         ]
     else:
         fallbacks = [
-            "Trends reveal underlying patterns. Strategic insight needed.",
-            "Cultural shifts create opportunities. Pattern recognition essential.",
+            f"Trends come and go but patterns remain {random.choice(emojis)} This one's actually worth paying attention to!",
+            f"Another day, another viral moment {random.choice(emojis)} But the strategic angle here is genuinely interesting!"
         ]
     
     post_text = random.choice(fallbacks)
-    cta = generate_strategic_cta("industry trends", content_type)
-    post_text += f" {cta}"
-    
-    selected_hashtags = random.sample(STRATEGIC_HASHTAGS, 2)
-    post_text += f" {' '.join(selected_hashtags)}"
+    hashtags = generate_hashtags("industry trends", content_type)
+    post_text += f" {hashtags}"
     
     return post_text
 
@@ -543,15 +567,13 @@ def create_opinion_fallback(topic=None):
     if not topic:
         topic = "industry strategy"
     
+    emojis = ["🤔", "🧐", "💭", "🎯"]
     fallback_polls = [
-        f"Best approach for {topic}?\nA: First mover\nB: Fast follower",
-        f"Strategic priority for {topic}?\nA: Innovation\nB: Execution"
+        f"Strategic dilemma time! {random.choice(emojis)} For {topic}, which approach wins?\nA: Go big or go home 🚀\nB: Slow and steady wins 🐢\nWhat's your move?",
+        f"Hot take needed! {random.choice(emojis)} On {topic}, which strategy?\nA: Innovate like crazy 💡\nB: Perfect what exists ⚡\nCast your vote! 👇"
     ]
     
     post_text = random.choice(fallback_polls)
-    selected_hashtags = random.sample(STRATEGIC_HASHTAGS, 2)
-    post_text += f" {' '.join(selected_hashtags)}"
-    
     return post_text
 
 # ================================
@@ -577,8 +599,8 @@ def select_post_type():
 def main():
     print("🐦 Strategic Content Analyst - Twitter Edition")
     print("=" * 50)
-    print("📰 Multi-Source Intelligence • AI-Powered CTAs")
-    print("🖼️ Image Support • Strategic Personality")
+    print("📰 Multi-Source Intelligence • AI-Powered Posts")
+    print("🎮 Human Personality • Smart & Witty")
     print("=" * 50)
     
     # Validate configuration
@@ -636,8 +658,8 @@ def main():
         print("\n✅ Strategic content successfully deployed!")
         print(f"🎯 Post type: {post_type.replace('_', ' ').title()}")
         print(f"🖼️ Image included: {'Yes' if image_url else 'No'}")
-        print("🤖 AI-generated CTAs and analysis")
-        print("🧠 Sophisticated personality maintained")
+        print("🤖 AI-powered personality")
+        print("😄 Human-like & engaging")
     else:
         print("\n❌ Deployment failed.")
 
