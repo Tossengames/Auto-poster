@@ -1,5 +1,6 @@
 import os
 import tweepy
+import random
 
 # Get from GitHub Secrets
 TWITTER_API_KEY = os.environ.get('TWITTER_API_KEY')
@@ -12,28 +13,32 @@ def post_to_twitter():
     try:
         print("Testing Twitter connection...")
         
-        # Authenticate with Twitter API
-        auth = tweepy.OAuthHandler(TWITTER_API_KEY, TWITTER_API_SECRET)
-        auth.set_access_token(TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET)
-        api = tweepy.API(auth)
+        # Authenticate with Twitter API v2
+        client = tweepy.Client(
+            consumer_key=TWITTER_API_KEY,
+            consumer_secret=TWITTER_API_SECRET,
+            access_token=TWITTER_ACCESS_TOKEN,
+            access_token_secret=TWITTER_ACCESS_TOKEN_SECRET
+        )
         
-        # Simple human-sounding message
+        # Simple human-sounding messages
         messages = [
             "Interesting how technology continues to reshape our daily interactions. The pace of change never slows.",
             "Observing patterns in how people adapt to new tools reveals so much about human nature and innovation.",
             "The intersection of creativity and technology always produces the most fascinating developments worth watching.",
-            "Some days you notice the small shifts that eventually become major trends. Today feels like one of those days."
+            "Some days you notice the small shifts that eventually become major trends. Today feels like one of those days.",
+            "There's something compelling about watching ideas evolve from concept to reality in the tech space.",
+            "The way we communicate and collaborate keeps evolving in unexpected ways. Always learning something new."
         ]
         
-        import random
         message = random.choice(messages)
         
         # Post the tweet
-        response = api.update_status(message)
+        response = client.create_tweet(text=message)
         
         print("✅ Success! Tweet posted:")
         print(f"📝 {message}")
-        print(f"🔗 Tweet ID: {response.id}")
+        print(f"🔗 Tweet ID: {response.data['id']}")
         return True
             
     except tweepy.TweepyException as e:
