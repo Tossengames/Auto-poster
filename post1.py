@@ -54,40 +54,8 @@ STRATEGIC_HASHTAGS = [
 # TWITTER/X API FUNCTIONS
 # ================================
 
-def upload_media(image_url, api_key, api_secret, access_token, access_token_secret):
-    """Download and upload an image to Twitter."""
-    try:
-        print(f"📤 Uploading media from {image_url}...")
-        
-        # Download the image
-        response = requests.get(image_url, timeout=30)
-        response.raise_for_status()
-        
-        # Save temporarily
-        temp_file = "/tmp/tweet_image.jpg"
-        with open(temp_file, "wb") as f:
-            f.write(response.content)
-        
-        # Authenticate and upload
-        auth = tweepy.OAuthHandler(api_key, api_secret)
-        auth.set_access_token(access_token, access_token_secret)
-        api = tweepy.API(auth)
-        
-        media = api.media_upload(filename=temp_file)
-        
-        # Clean up
-        if os.path.exists(temp_file):
-            os.remove(temp_file)
-            
-        print(f"✅ Media uploaded successfully! ID: {media.media_id_string}")
-        return media.media_id_string
-        
-    except Exception as e:
-        print(f"❌ Media upload failed: {e}")
-        return None
-
 def post_to_twitter(content, api_key, api_secret, access_token, access_token_secret, image_url=None):
-    """Post content to Twitter/X with optional image"""
+    """Post content to Twitter/X with optional image using the correct API versions"""
     try:
         print("🐦 Posting to Twitter/X...")
         
@@ -96,36 +64,52 @@ def post_to_twitter(content, api_key, api_secret, access_token, access_token_sec
             print(f"📏 Content too long ({len(content)} chars), truncating...")
             content = content[:277] + "..."
         
+        # --- UPLOAD MEDIA (using v1.1) ---
         media_ids = []
         if image_url:
-            media_id = upload_media(image_url, api_key, api_secret, access_token, access_token_secret)
-            if media_id:
-                media_ids.append(media_id)
+            print(f"📤 Uploading media from {image_url}...")
+            
+            # Use v1.1 API for media upload (this is allowed on Free tier)
+            auth_v1 = tweepy.OAuthHandler(api_key, api_secret)
+            auth_v1.set_access_token(access_token, access_token_secret)
+            api_v1 = tweepy.API(auth_v1)
+            
+            # Download image and upload
+            response = requests.get(image_url, timeout=30)
+            response.raise_for_status()
+            
+            # Save temporarily
+            temp_file = "/tmp/tweet_image.jpg"
+            with open(temp_file, "wb") as f:
+                f.write(response.content)
+            
+            media = api_v1.media_upload(filename=temp_file)
+            media_ids.append(media.media_id_string)
+            
+            # Clean up
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+                
+            print(f"✅ Media uploaded successfully! ID: {media.media_id_string}")
         
-        # Authenticate with Twitter API v2
-        client = tweepy.Client(
+        # --- CREATE TWEET (using v2) ---
+        # This is the crucial change: use tweepy.Client for v2
+        client_v2 = tweepy.Client(
             consumer_key=api_key,
             consumer_secret=api_secret,
             access_token=access_token,
             access_token_secret=access_token_secret
         )
         
-        # Post the tweet
+        # Post the tweet using v2 endpoint
         if media_ids:
-            # For media, we need to use v1.1 API
-            auth = tweepy.OAuthHandler(api_key, api_secret)
-            auth.set_access_token(access_token, access_token_secret)
-            api = tweepy.API(auth)
-            response = api.update_status(status=content, media_ids=media_ids)
-            print("✅ Tweet with image posted successfully!")
+            response = client_v2.create_tweet(text=content, media_ids=media_ids)
         else:
-            # For text-only, use v2 API
-            response = client.create_tweet(text=content)
-            print("✅ Text-only tweet posted successfully!")
-            
-        if response:
-            tweet_id = response.id if hasattr(response, 'id') else response.data['id']
-            print(f"🎉 Tweet ID: {tweet_id}")
+            response = client_v2.create_tweet(text=content)
+        
+        if response and response.data:
+            tweet_id = response.data['id']
+            print(f"🎉 Successfully tweeted! Tweet ID: {tweet_id}")
             return True
         else:
             print("❌ Twitter post failed: No response data")
@@ -245,7 +229,6 @@ def extract_image_from_entry(entry):
             content_text = entry.summary
         
         # Simple regex to find image URLs in content
-        import re
         image_urls = re.findall(r'<img[^>]+src="([^">]+)"', content_text)
         if image_urls:
             return image_urls[0]
