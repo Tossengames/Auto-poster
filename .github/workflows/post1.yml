@@ -2,7 +2,7 @@ name: Twitter Strategic Content Bot
 
 on:
   schedule:
-    # Run daily at 9 AM UTC (adjust as needed)
+    # Run daily at 9 AM UTC
     - cron: '0 9 * * *'
   workflow_dispatch:  # Allow manual triggering
 
@@ -30,14 +30,6 @@ jobs:
         TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
         TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
         TWITTER_ACCESS_TOKEN_SECRET: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}
-        TWITTER_BEARER_TOKEN: ${{ secrets.TWITTER_BEARER_TOKEN }}
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       run: |
         python post1.py
-        
-    - name: Notify on failure
-      if: failure()
-      uses: actions/github-script@v6
-      with:
-        script: |
-          console.log('Twitter bot execution failed - check workflow logs');
