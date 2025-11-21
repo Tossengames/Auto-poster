@@ -371,6 +371,7 @@ def generate_hashtags(topic, content_type):
     """
     
     try:
+        # Updated for Gemini 2.0 Flash
         response = requests.post(
             "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent",
             params={"key": GEMINI_API_KEY},
@@ -559,6 +560,7 @@ def generate_ai_content(prompt, content, content_type, main_topic):
     try:
         print(f"🎭 Generating {content_type} post...")
         
+        # Updated for Gemini 2.0 Flash
         response = requests.post(
             "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent",
             params={"key": GEMINI_API_KEY},
@@ -653,16 +655,16 @@ def create_opinion_fallback(topic=None):
     return poll_text
 
 # ================================
-# POST TYPE SELECTOR
+# POST TYPE SELECTOR - UPDATED FOR 50% TRENDS
 # ================================
 
 def select_post_type():
-    """Randomly select post type with weighted probability"""
+    """Randomly select post type with weighted probability - 50% for trends"""
     post_types = [
-        ('tech', 0.3),        # 30% tech posts
-        ('game_dev', 0.3),    # 30% game dev posts  
-        ('trending', 0.2),    # 20% trending topics
-        ('opinion_poll', 0.2) # 20% opinion polls
+        ('trending', 0.5),    # 50% trending topics (increased from 20%)
+        ('tech', 0.2),        # 20% tech posts (reduced from 30%)
+        ('game_dev', 0.2),    # 20% game dev posts (reduced from 30%)  
+        ('opinion_poll', 0.1) # 10% opinion polls (reduced from 20%)
     ]
     
     choices, weights = zip(*post_types)
@@ -676,7 +678,8 @@ def main():
     print("🐦 Strategic Content Analyst - Twitter Edition")
     print("=" * 50)
     print("📰 QUALITY CONTENT ONLY • NO PROMOTIONS")
-    print("🎮 Genuine Tech/Game Dev Insights")
+    print("🎮 50% TRENDS • Genuine Tech/Game Dev Insights")
+    print("🤖 Using Gemini 2.0 Flash")
     print("=" * 50)
     
     # Validate configuration
@@ -689,7 +692,7 @@ def main():
         return
     
     print(f"✅ Twitter API configured")
-    print(f"✅ Gemini API configured")
+    print(f"✅ Gemini 2.0 Flash configured")
     print("")
     
     # Select post type
@@ -735,7 +738,8 @@ def main():
         print(f"🎯 Post type: {post_type.replace('_', ' ').title()}")
         print(f"🖼️ Image included: {'Yes' if image_url else 'No'}")
         print("🚫 PROMOTIONAL CONTENT FILTERED OUT")
-        print("🎯 GENUINE TECH/GAME DEV INSIGHTS ONLY")
+        print("📈 50% TRENDS FOCUS")
+        print("🤖 GEMINI 2.0 FLASH")
     else:
         print("\n❌ Deployment failed.")
 
