@@ -45,9 +45,9 @@ GAME_DEV_RSS_FEEDS = [
 
 # Strategic Hashtags (shorter for Twitter)
 STRATEGIC_HASHTAGS = [
-    "#StrategicThinking", "#TechStrategy", "#GameDev",
-    "#FutureTrends", "#Innovation", "#Leadership",
-    "#OpinionPoll", "#IndustryDebate", "#DevThoughts"
+    "#Strategy", "#Tech", "#GameDev",
+    "#Trends", "#Innovation", "#Leadership",
+    "#Poll", "#Debate", "#Thoughts"
 ]
 
 # ================================
@@ -274,20 +274,17 @@ def get_google_trends_topics():
 def generate_strategic_cta(topic, content_type):
     """Generate AI-powered strategic CTA"""
     prompt = f"""
-    Create a sophisticated, strategic call-to-action for a Twitter post about {topic}.
-    
-    Content type: {content_type}
+    Create a strategic call-to-action for a Twitter post about {topic}.
     
     Requirements:
-    - Sound like a master strategist challenging conventional thinking
-    - Pose a thought-provoking question that requires strategic analysis
-    - Make readers feel they're part of an intellectual discussion
-    - Avoid generic phrases like "what do you think"
-    - Keep it under 100 characters for Twitter
+    - Sound like a strategist challenging conventional thinking
+    - Pose a thought-provoking question
+    - Keep it under 40 characters
     
-    Examples of good CTAs:
-    "The pattern reveals itself. Your strategic assessment?"
-    "Most react. The insightful anticipate. Your perspective?"
+    Examples:
+    "Your strategic take?"
+    "Patterns emerging. Your view?"
+    "Strategic implications?"
     
     Return ONLY the CTA text.
     """
@@ -307,13 +304,15 @@ def generate_strategic_cta(topic, content_type):
                 cta = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                 cta = cta.replace('```', '').strip()
                 cta = remove_ai_indicators(cta)
+                if len(cta) > 40:
+                    cta = cta[:37] + "..."
                 print(f"🎯 AI-generated CTA: {cta}")
                 return cta
     except Exception as e:
         print(f"❌ CTA generation error: {e}")
     
     # Fallback CTA
-    return "Strategic implications worth discussing?"
+    return "Your strategic take?"
 
 def generate_tech_analysis_post(articles):
     """Generate sophisticated tech analysis post"""
@@ -332,32 +331,18 @@ def generate_tech_analysis_post(articles):
             break
     
     prompt = f"""
-    Create a Twitter post analyzing technology trends with a sophisticated, strategic tone.
-    Sound like a master strategist revealing patterns others miss.
+    Create a SHORT Twitter post analyzing tech trends. MAX 120 characters for main content.
 
-    Recent tech developments:
-    {chr(10).join([f"- {article['title']}" for article in selected_articles])}
+    Topic: {main_topic}
 
-    Writing style:
-    - Sophisticated, strategic, intellectually superior
-    - Connect developments to reveal larger patterns
-    - Focus on strategic implications
-    - Pose thought-provoking questions
-    - Sound like you're revealing truths most overlook
+    Style: Strategic, insightful, concise
+    - One sharp observation
+    - Strategic implication
+    - Leave space for CTA and hashtags
 
-    Structure:
-    1. Start with an insightful observation
-    2. Connect developments to show patterns
-    3. Discuss strategic implications
-    4. End with a provocative question (leave space for CTA)
+    Total target: 120 chars for main text + 40 for CTA + 20 for hashtags = 180 total
 
-    Important: 
-    - DO NOT include a final CTA question - leave space for it to be added later.
-    - Make it sound completely human-written. No AI phrasing.
-    - Keep it under 180 characters to leave space for CTA and hashtags.
-    - Be concise for Twitter format.
-
-    Return ONLY the post text.
+    Return ONLY the post text (without CTA or hashtags).
     """
     
     post_text = generate_ai_content(prompt, selected_articles, 'tech', main_topic)
@@ -380,31 +365,18 @@ def generate_game_dev_post(articles):
             break
     
     prompt = f"""
-    Create a Twitter post about game development with a strategic, mastermind tone.
-    Analyze industry movements like a chess grandmaster anticipating moves.
+    Create a SHORT Twitter post about game dev trends. MAX 120 characters for main content.
 
-    Recent game industry developments:
-    {chr(10).join([f"- {article['title']}" for article in selected_articles])}
+    Topic: {main_topic}
 
-    Writing style:
-    - Calculated, precise, intellectually superior
-    - Reveal how developments create strategic opportunities
-    - Focus on patterns rather than individual events
-    - Sound like you understand the underlying game theory
+    Style: Strategic, industry-focused, concise
+    - One key insight
+    - Industry implication  
+    - Leave space for CTA and hashtags
 
-    Structure:
-    1. Start with a strategic observation
-    2. Connect developments to show strategic landscape
-    3. Discuss positioning and advantage
-    4. End with a strategic insight (leave space for CTA)
+    Total target: 120 chars for main text + 40 for CTA + 20 for hashtags = 180 total
 
-    Important: 
-    - DO NOT include a final CTA question - leave space for it to be added later.
-    - Make it sound completely human-written. No AI phrasing.
-    - Keep it under 180 characters to leave space for CTA and hashtags.
-    - Be concise for Twitter format.
-
-    Return ONLY the post text.
+    Return ONLY the post text (without CTA or hashtags).
     """
     
     post_text = generate_ai_content(prompt, selected_articles, 'game dev', main_topic)
@@ -418,30 +390,18 @@ def generate_trending_topic_post(trends):
     main_topic = trends[0]
     
     prompt = f"""
-    Create a Twitter post analyzing current trending topics with sophisticated strategic insight.
-    Sound like an analyst who understands why things trend when they do.
+    Create a SHORT Twitter post about trending topics. MAX 120 characters for main content.
 
-    Current trending topics: {', '.join(trends[:3])}
+    Topic: {main_topic}
 
-    Writing style:
-    - Strategic, analytical, intellectually curious
-    - Explain the underlying reasons for these trends
-    - Connect trends to larger cultural/technological shifts
-    - Pose insightful questions
+    Style: Analytical, insightful, concise
+    - Why this trends matters
+    - Strategic perspective
+    - Leave space for CTA and hashtags
 
-    Structure:
-    1. Start with an observation about trend patterns
-    2. Analyze what's driving these trends
-    3. Discuss broader implications
-    4. End with an analytical insight (leave space for CTA)
+    Total target: 120 chars for main text + 40 for CTA + 20 for hashtags = 180 total
 
-    Important: 
-    - DO NOT include a final CTA question - leave space for it to be added later.
-    - Make it sound completely human-written. No AI phrasing.
-    - Keep it under 180 characters to leave space for CTA and hashtags.
-    - Be concise for Twitter format.
-
-    Return ONLY the post text.
+    Return ONLY the post text (without CTA or hashtags).
     """
     
     post_text = generate_ai_content(prompt, trends, 'trending', main_topic)
@@ -456,29 +416,20 @@ def generate_trend_based_opinion_poll(trends):
     poll_topic = random.choice(trends[:5])
     
     prompt = f"""
-    Create a Twitter opinion poll post that sparks strategic debate about this trending topic: {poll_topic}
-    
-    Sound like a sophisticated industry analyst presenting strategic perspectives.
-    
-    Create a post that:
-    1. Presents the trending topic as a strategic dilemma
-    2. Offers 2-3 distinct strategic perspectives
-    3. Formats it as clear options for discussion
-    
-    Format it exactly like this:
-    [Your strategic analysis - 1-2 sentences max]
-    
-    The strategic question: [Pose the core question]
-    
-    Option A: [First perspective]
-    Option B: [Second perspective]
-    
-    [Brief concluding thought]
-    
-    Make it sound completely human-written with sophisticated, strategic language.
-    Keep it under 250 characters.
-    
-    Return ONLY the post text.
+    Create a SHORT Twitter opinion poll. MAX 160 characters TOTAL including options.
+
+    Topic: {poll_topic}
+
+    Format:
+    [Question about strategic approach - max 80 chars]
+    A: [Option 1 - max 20 chars]
+    B: [Option 2 - max 20 chars]
+    [Space for hashtags]
+
+    Keep entire post under 160 characters.
+    Make options clear and contrasting.
+
+    Return the complete post text.
     """
     
     try:
@@ -499,10 +450,14 @@ def generate_trend_based_opinion_poll(trends):
                 post_text = post_text.replace('```', '').strip()
                 post_text = remove_ai_indicators(post_text)
                 
-                # Ensure proper formatting for poll options
-                if "Option A:" not in post_text:
-                    # Add poll formatting if missing
-                    post_text += f"\n\nOption A: Immediate market capture\nOption B: Long-term differentiation"
+                # Ensure it's short enough
+                if len(post_text) > 160:
+                    # Truncate but keep the structure
+                    lines = post_text.split('\n')
+                    if len(lines) >= 3:
+                        # Shorten the question line
+                        lines[0] = lines[0][:70] + "..." if len(lines[0]) > 70 else lines[0]
+                        post_text = '\n'.join(lines[:3])  # Keep only question and 2 options
                 
                 print(f"✅ Opinion poll created ({len(post_text)} chars)")
                 return post_text
@@ -533,15 +488,21 @@ def generate_ai_content(prompt, content, content_type, main_topic):
                 post_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                 post_text = post_text.replace('```', '').strip()
                 
-                # Add AI-generated CTA
-                cta = generate_strategic_cta(main_topic, content_type)
-                post_text += f"\n\n{cta}"
-                
-                # Add hashtags (fewer for Twitter)
-                selected_hashtags = random.sample(STRATEGIC_HASHTAGS, 2)
-                post_text += f"\n\n{' '.join(selected_hashtags)}"
+                # For non-poll posts, add CTA and hashtags
+                if content_type != 'opinion_poll':
+                    # Add AI-generated CTA
+                    cta = generate_strategic_cta(main_topic, content_type)
+                    post_text += f" {cta}"
+                    
+                    # Add hashtags (fewer for Twitter)
+                    selected_hashtags = random.sample(STRATEGIC_HASHTAGS, 2)
+                    post_text += f" {' '.join(selected_hashtags)}"
                 
                 post_text = remove_ai_indicators(post_text)
+                
+                # Final length check and truncation if needed
+                if len(post_text) > 280:
+                    post_text = post_text[:277] + "..."
                 
                 print(f"✅ {content_type.title()} post created ({len(post_text)} chars)")
                 return post_text
@@ -571,26 +532,26 @@ def create_fallback_post(content_type):
     """Create sophisticated fallback posts"""
     if content_type == 'tech':
         fallbacks = [
-            "Tech evolution reveals strategic patterns most overlook. The convergence of AI, cloud, and edge computing reshapes digital interaction paradigms.",
-            "Strategic advantage lies in understanding underlying currents that make developments inevitable. Forward-thinkers position for the next paradigm shift."
+            "Tech shifts reveal strategic patterns. Forward-thinkers adapt.",
+            "Innovation cycles accelerate. Strategic positioning matters.",
         ]
     elif content_type == 'game dev':
         fallbacks = [
-            "Gaming's evolution shows fascinating patterns. Real battles are in distribution and community engagement—building moats beyond individual games.",
-            "Player expectations evolve faster than studios adapt. It's about deeper engagement and authentic community, not just better graphics."
+            "Game industry evolves. Community beats graphics.",
+            "Player expectations shift. Engagement is key.",
         ]
     else:
         fallbacks = [
-            "Trends reveal collective psychology. The strategic mind looks beyond popularity to understand unmet needs driving adoption.",
-            "Pattern recognition separates reactive from strategic. While most chase trends, the insightful analyze why ideas gain traction."
+            "Trends reveal underlying patterns. Strategic insight needed.",
+            "Cultural shifts create opportunities. Pattern recognition essential.",
         ]
     
     post_text = random.choice(fallbacks)
     cta = generate_strategic_cta("industry trends", content_type)
-    post_text += f"\n\n{cta}"
+    post_text += f" {cta}"
     
     selected_hashtags = random.sample(STRATEGIC_HASHTAGS, 2)
-    post_text += f"\n\n{' '.join(selected_hashtags)}"
+    post_text += f" {' '.join(selected_hashtags)}"
     
     return post_text
 
@@ -600,14 +561,13 @@ def create_opinion_fallback(topic=None):
         topic = "industry strategy"
     
     fallback_polls = [
-        f"Strategic landscape around {topic} presents a compelling dilemma.\n\nThe question: Which approach delivers sustainable advantage?\n\nOption A: Market penetration & scaling\nOption B: Niche specialization\n\nYour strategic analysis?",
-        
-        f"Evolution of {topic} creates strategic crossroads.\n\nThe question: Optimal positioning in shifting landscape?\n\nOption A: First-mover advantage\nOption B: Fast-follower strategy\n\nYour perspective?"
+        f"Best approach for {topic}?\nA: First mover\nB: Fast follower",
+        f"Strategic priority for {topic}?\nA: Innovation\nB: Execution"
     ]
     
     post_text = random.choice(fallback_polls)
     selected_hashtags = random.sample(STRATEGIC_HASHTAGS, 2)
-    post_text += f"\n\n{' '.join(selected_hashtags)}"
+    post_text += f" {' '.join(selected_hashtags)}"
     
     return post_text
 
@@ -674,7 +634,7 @@ def main():
         post_text = generate_trend_based_opinion_poll(trends)
         image_url = None
     
-    print(f"📝 Post preview: {post_text[:100]}...")
+    print(f"📝 Post: {post_text}")
     print(f"📏 Character count: {len(post_text)}")
     print(f"🖼️ Image available: {'Yes' if image_url else 'No'}")
     
