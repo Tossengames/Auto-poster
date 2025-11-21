@@ -47,6 +47,44 @@ PROMOTIONAL_KEYWORDS = [
     'promotion', 'bundle', 'free trial', 'subscribe', 'sign up', 'get started'
 ]
 
+# Poll templates for better formatting
+POLL_TEMPLATES = {
+    'game_design': [
+        {
+            'question': "Indie devs: What's your priority for player engagement? 🎮",
+            'options': ["Deep core mechanics", "Accessible gameplay", "Strong narrative", "Visual polish"]
+        },
+        {
+            'question': "For your next project, which comes first? 💡",
+            'options': ["Unique game mechanics", "Market appeal", "Art style", "Story depth"]
+        },
+        {
+            'question': "Indie dev dilemma: Where do you invest time first? ⏰",
+            'options': ["Core gameplay loop", "UI/UX polish", "Content variety", "Performance optimization"]
+        }
+    ],
+    'tech_strategy': [
+        {
+            'question': "Tech founders: What's your launch priority? 🚀",
+            'options': ["Product stability", "Feature richness", "User onboarding", "Scalability"]
+        },
+        {
+            'question': "Startup strategy: Focus first on? 💭",
+            'options': ["MVP development", "User acquisition", "Funding rounds", "Team building"]
+        }
+    ],
+    'industry_trends': [
+        {
+            'question': "AI in gaming: Biggest opportunity? 🤖",
+            'options': ["Procedural content", "NPC behavior", "Development tools", "Player analytics"]
+        },
+        {
+            'question': "Game dev trend with most impact? 📈",
+            'options': ["Cloud gaming", "VR/AR", "Cross-platform", "Live service"]
+        }
+    ]
+}
+
 # ================================
 # CONTENT FILTERING FUNCTIONS
 # ================================
@@ -489,65 +527,32 @@ def generate_trend_based_opinion_poll(trends):
     # Select a trending topic for the poll
     poll_topic = random.choice(trends[:5])
     
-    prompt = f"""
-    Create a SHORT, engaging Twitter opinion poll about genuine tech/gaming topics. MAX 180 characters TOTAL.
-
-    Topic: {poll_topic}
-
-    IMPORTANT: Focus on strategic decisions, development approaches, or industry perspectives.
-    DO NOT mention commercial aspects, purchases, or promotions.
-
-    Writing style:
-    - Sound like a curious, engaging community member
-    - Add personality and subtle humor
-    - Use 1-2 relevant emojis
-    - Make it conversational and fun
-    - Keep options clear but interesting
-    - Focus on development strategies, design choices, or industry perspectives
-
-    Format:
-    [Engaging question about strategy/development - max 100 chars]
-    A: [Strategic option 1 - max 25 chars]
-    B: [Strategic option 2 - max 25 chars]
-    [Brief engaging call to vote]
-
-    Return the complete post text (without additional hashtags).
-    """
+    # Choose a poll template based on the topic
+    if any(keyword in poll_topic.lower() for keyword in ['game', 'gaming', 'indie', 'developer']):
+        template_type = 'game_design'
+    elif any(keyword in poll_topic.lower() for keyword in ['tech', 'ai', 'startup', 'software']):
+        template_type = 'tech_strategy'
+    else:
+        template_type = 'industry_trends'
     
-    try:
-        print(f"🗳️ Generating opinion poll about trending topic: {poll_topic}")
-        
-        response = requests.post(
-            "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent",
-            params={"key": GEMINI_API_KEY},
-            headers={"Content-Type": "application/json"},
-            json={"contents": [{"parts": [{"text": prompt}]}]},
-            timeout=30
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            if "candidates" in data and data["candidates"]:
-                post_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                post_text = post_text.replace('```', '').strip()
-                post_text = remove_ai_indicators(post_text)
-                
-                # Ensure it's short enough
-                if len(post_text) > 180:
-                    lines = post_text.split('\n')
-                    if len(lines) >= 3:
-                        lines[0] = lines[0][:90] + "..." if len(lines[0]) > 90 else lines[0]
-                        post_text = '\n'.join(lines[:4])
-                
-                print(f"✅ Opinion poll created ({len(post_text)} chars)")
-                return post_text
-        else:
-            print(f"❌ Poll generation error: {response.text}")
-            
-    except Exception as e:
-        print(f"❌ Opinion poll generation error: {e}")
+    template = random.choice(POLL_TEMPLATES[template_type])
     
-    return create_opinion_fallback(poll_topic)
+    # Format the poll with clear, logical options
+    poll_text = f"{template['question']}\n\n"
+    
+    # Add options with letters
+    options = template['options']
+    for i, option in enumerate(options[:4]):  # Max 4 options for Twitter polls
+        poll_text += f"{chr(65+i)}: {option}\n"
+    
+    poll_text += "\nVote below! 👇"
+    
+    # Add relevant hashtags
+    hashtags = generate_hashtags(poll_topic, 'poll')
+    poll_text += f" {hashtags}"
+    
+    print(f"✅ Opinion poll created ({len(poll_text)} chars)")
+    return poll_text
 
 def generate_ai_content(prompt, content, content_type, main_topic):
     """Generate content using AI and add AI-powered hashtags"""
@@ -633,14 +638,19 @@ def create_opinion_fallback(topic=None):
     if not topic:
         topic = "industry strategy"
     
-    emojis = ["🤔", "🧐", "💭", "🎯"]
-    fallback_polls = [
-        f"Strategic dilemma time! {random.choice(emojis)} For {topic}, which approach wins?\nA: Go big or go home 🚀\nB: Slow and steady wins 🐢\nWhat's your move?",
-        f"Hot take needed! {random.choice(emojis)} On {topic}, which strategy?\nA: Innovate like crazy 💡\nB: Perfect what exists ⚡\nCast your vote! 👇"
-    ]
+    # Use template-based fallback
+    template = random.choice(POLL_TEMPLATES['game_design'])
+    poll_text = f"{template['question']}\n\n"
     
-    post_text = random.choice(fallback_polls)
-    return post_text
+    options = template['options']
+    for i, option in enumerate(options[:4]):
+        poll_text += f"{chr(65+i)}: {option}\n"
+    
+    poll_text += "\nVote below! 👇"
+    hashtags = generate_hashtags(topic, 'poll')
+    poll_text += f" {hashtags}"
+    
+    return poll_text
 
 # ================================
 # POST TYPE SELECTOR
