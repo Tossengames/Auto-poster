@@ -58,6 +58,97 @@ POST_STYLES = [
 ]
 
 # ================================
+# SEASONAL & TIME AWARENESS FUNCTIONS
+# ================================
+
+def get_season():
+    """Get current season based on date"""
+    today = datetime.now()
+    month = today.month
+    
+    if month in [12, 1, 2]:
+        return "winter"
+    elif month in [3, 4, 5]:
+        return "spring"
+    elif month in [6, 7, 8]:
+        return "summer"
+    else:
+        return "fall"
+
+def get_seasonal_hashtags():
+    """Get seasonal hashtags"""
+    season = get_season()
+    seasonal_hashtags = {
+        "winter": ["#WinterTech", "#GameDevWinter", "#HolidayGaming", "#WinterInnovation"],
+        "spring": ["#SpringTech", "#GameDevSpring", "#SpringGaming", "#SpringInnovation"],
+        "summer": ["#SummerTech", "#SummerGameDev", "#SummerGaming", "#SunmerInnovation"],
+        "fall": ["#FallTech", "#AutumnGameDev", "#FallGaming", "#FallInnovation"]
+    }
+    return random.sample(seasonal_hashtags.get(season, []), 2)
+
+def get_day_specific_hashtags():
+    """Get hashtags specific to the day of week"""
+    today = datetime.now()
+    day_name = today.strftime("%A").lower()
+    
+    day_hashtags = {
+        "monday": ["#MondayMotivation", "#GameDevMonday", "#TechMonday", "#NewWeek"],
+        "tuesday": ["#TechTuesday", "#GameDevTuesday", "#IndieDevTuesday", "#TuesdayTips"],
+        "wednesday": ["#WednesdayWisdom", "#GameDevWednesday", "#MidweekTech", "#WIPWednesday"],
+        "thursday": ["#ThrowbackThursday", "#TechThursday", "#GameDevThursday", "#TBT"],
+        "friday": ["#FridayFeeling", "#GameDevFriday", "#TechFriday", "#FridayFun"],
+        "saturday": ["#ScreenshotSaturday", "#GameDevSaturday", "#WeekendTech", "#IndieSaturday"],
+        "sunday": ["#SundayFunday", "#GameDevSunday", "#WeekendGaming", "#SundayTech"]
+    }
+    return random.sample(day_hashtags.get(day_name, []), 2)
+
+def is_special_occasion():
+    """Check if today is a special occasion"""
+    today = datetime.now()
+    month_day = (today.month, today.day)
+    
+    special_occasions = {
+        (12, 24): "christmas_eve",
+        (12, 25): "christmas",
+        (12, 31): "new_years_eve",
+        (1, 1): "new_year",
+        (10, 31): "halloween",
+        (2, 14): "valentines",
+        (7, 4): "independence_day",
+        (11, 24): "thanksgiving"  # Approximate
+    }
+    
+    return special_occasions.get(month_day)
+
+def get_occasion_hashtags(occasion):
+    """Get hashtags for special occasions"""
+    occasion_hashtags = {
+        "christmas_eve": ["#ChristmasEve", "#HolidayTech", "#GameDevHoliday", "#SeasonsGreetings"],
+        "christmas": ["#MerryChristmas", "#ChristmasGaming", "#HolidayTech", "#ChristmasDay"],
+        "new_years_eve": ["#NewYearsEve", "#YearInReview", "#GameDev2024", "#NYE"],
+        "new_year": ["#HappyNewYear", "#NewYearNewGames", "#Tech2024", "#NewBeginnings"],
+        "halloween": ["#Halloween", "#SpookyGames", "#HalloweenTech", "#TrickOrTreat"],
+        "valentines": ["#ValentinesDay", "#GameDevLove", "#TechLove", "#Valentines"],
+        "independence_day": ["#IndependenceDay", "#July4th", "#PatrioticGames", "#SummerTech"],
+        "thanksgiving": ["#Thanksgiving", "#GratefulGaming", "#ThankfulTech", "#TurkeyDay"]
+    }
+    return random.sample(occasion_hashtags.get(occasion, []), 2)
+
+def get_occasion_mood(occasion):
+    """Get mood/feeling for special occasions"""
+    occasion_moods = {
+        "christmas_eve": "festive and magical",
+        "christmas": "joyful and celebratory",
+        "new_years_eve": "reflective and excited",
+        "new_year": "hopeful and fresh",
+        "halloween": "spooky and fun",
+        "valentines": "loving and appreciative",
+        "independence_day": "patriotic and celebratory",
+        "thanksgiving": "grateful and warm"
+    }
+    return occasion_moods.get(occasion, "thoughtful")
+
+# ================================
 # CONTENT FILTERING FUNCTIONS
 # ================================
 
@@ -322,22 +413,28 @@ def get_google_trends_topics():
         return ['gaming industry', 'tech innovation', 'software development', 'creative tools']
 
 def generate_hashtags(topic, content_type):
-    """Generate relevant hashtags using AI"""
+    """Generate relevant hashtags using AI with seasonal/day awareness"""
+    # Get special occasion first
+    occasion = is_special_occasion()
+    
     prompt = f"""
     Generate 3-4 highly relevant, popular hashtags for a {content_type} post about: {topic}
     
-    Focus on genuine tech/game dev content, not promotions.
+    Current season: {get_season()}
+    Today is: {datetime.now().strftime('%A')}
+    {f"Special occasion: {occasion}" if occasion else ""}
     
     Requirements:
     - Mix popular and niche hashtags
-    - Include trending hashtags when relevant
+    - Include seasonal relevance when appropriate
+    - Consider day of week (e.g., #ScreenshotSaturday for Saturday)
     - Focus on {content_type} space (tech, gaming, indie dev, etc.)
     - Keep them short and effective
     - Return ONLY the hashtags as: #First #Second #Third
     
-    Examples for tech: #AI #Tech #Innovation #FutureTech
-    Examples for gaming: #GameDev #IndieDev #Gaming #Unity
-    Examples for trends: #TechNews #Future #DigitalTrends
+    Examples for Saturday game dev: #ScreenshotSaturday #GameDev #IndieDev #Gaming
+    Examples for winter tech: #WinterTech #AI #Innovation #Tech
+    Examples for Friday: #FridayFeeling #GameDevFriday #Tech
     
     Make them feel current and relevant to genuine content.
     """
@@ -362,17 +459,24 @@ def generate_hashtags(topic, content_type):
     except Exception as e:
         print(f"❌ Hashtag generation error: {e}")
     
-    # Fallback hashtags
-    if content_type == 'tech':
-        return "#Tech #AI #Innovation #Future"
-    elif content_type == 'game dev':
-        return "#GameDev #IndieDev #Gaming #DevLife"
+    # Fallback: Combine AI hashtags with seasonal/day ones
+    base_hashtags = "#Tech #GameDev #IndieDev"
+    seasonal_hashtags = " ".join(get_seasonal_hashtags())
+    day_hashtags = " ".join(get_day_specific_hashtags())
+    
+    if occasion:
+        occasion_hashtags = " ".join(get_occasion_hashtags(occasion))
+        return f"{base_hashtags} {seasonal_hashtags} {day_hashtags} {occasion_hashtags}"
     else:
-        return "#TechNews #Trends #Insights"
+        return f"{base_hashtags} {seasonal_hashtags} {day_hashtags}"
 
 def get_post_style_prompt(style, topic, content_type):
-    """Get different writing styles for variety"""
-    style_prompts = {
+    """Get different writing styles for variety with seasonal awareness"""
+    occasion = is_special_occasion()
+    season = get_season()
+    day_name = datetime.now().strftime("%A")
+    
+    base_prompts = {
         "witty_observer": f"""
         Create a witty, observant tweet about {topic}. Sound like someone who's been around the block in {content_type}.
         Add dry humor and make it feel like a real person's observation, not corporate speak.
@@ -409,7 +513,33 @@ def get_post_style_prompt(style, topic, content_type):
         Keep it under 180 characters. Be questioning but not negative.
         """
     }
-    return style_prompts.get(style, style_prompts["witty_observer"])
+    
+    base_prompt = base_prompts.get(style, base_prompts["witty_observer"])
+    
+    # Add seasonal/occasion context
+    if occasion:
+        mood = get_occasion_mood(occasion)
+        if occasion == "christmas":
+            base_prompt += f"\n\nIt's Christmas! Add some holiday cheer and warmth to the post. Make it feel {mood} and festive."
+        elif occasion == "new_year":
+            base_prompt += f"\n\nIt's New Year's Day! Add some hopeful, fresh energy looking forward to the year ahead. Make it feel {mood}."
+        else:
+            base_prompt += f"\n\nIt's a special occasion! Add some {mood} vibes to match the day."
+    
+    # Add seasonal context
+    season_context = {
+        "winter": "Add some cozy winter vibes - perfect for indoor dev work and gaming!",
+        "spring": "Add some fresh spring energy - new beginnings and growth!",
+        "summer": "Add some sunny summer vibes - great for gaming sessions and outdoor coding!",
+        "fall": "Add some cozy fall atmosphere - perfect for getting creative work done!"
+    }
+    base_prompt += f"\n\n{season_context.get(season, '')}"
+    
+    # Add day-specific context for weekends
+    if day_name.lower() in ['saturday', 'sunday']:
+        base_prompt += f"\n\nIt's the weekend! Perfect time for gaming and creative projects."
+    
+    return base_prompt
 
 def generate_tech_analysis_post(articles):
     """Generate sophisticated tech analysis post - ONLY QUALITY CONTENT"""
@@ -469,10 +599,17 @@ def generate_game_dev_post(articles):
     style = random.choice(POST_STYLES)
     print(f"🎨 Using post style: {style}")
     
+    # Special handling for ScreenshotSaturday
+    day_name = datetime.now().strftime("%A").lower()
+    screenshot_saturday_note = ""
+    if day_name == "saturday":
+        screenshot_saturday_note = "Since it's Saturday, consider mentioning sharing progress or work-in-progress like you would for #ScreenshotSaturday."
+    
     prompt = f"""
     {get_post_style_prompt(style, main_topic, 'game development')}
 
     Topic context: {main_topic}
+    {screenshot_saturday_note}
 
     IMPORTANT: 
     - Focus on game development, design insights, player experience
@@ -537,11 +674,19 @@ def generate_trend_based_opinion_poll(trends):
     
     poll_topic = random.choice(filtered_trends[:5])
     
-    poll_types = [
-        f"Game dev approach for {poll_topic}? 🎮\nA: Focus on innovation\nB: Polish existing ideas\nC: Community-driven\nD: Solo creative vision\n\nWhat's your style? 👇",
-        f"Tech strategy for {poll_topic}? 💡\nA: Build fast & iterate\nB: Plan thoroughly first\nC: User feedback driven\nD: Vision-led development\n\nYour approach? ⬇️",
-        f"Indie dev priority with {poll_topic}? ⚡\nA: Unique mechanics\nB: Visual style\nC: Story/narrative\nD: Performance\n\nWhat comes first? 👇"
-    ]
+    # Special handling for Saturday
+    day_name = datetime.now().strftime("%A").lower()
+    if day_name == "saturday":
+        poll_types = [
+            f"ScreenshotSaturday question! For {poll_topic}, what's your focus? 🎮\nA: Visual polish & screenshots\nB: Core gameplay mechanics\nC: Level design & environments\nD: Character art & animation\n\nShare your progress! 👇",
+            f"#ScreenshotSaturday poll! When working on {poll_topic}, you prioritize:\nA: Beautiful visuals & art\nB: Smooth gameplay & controls\nC: Engaging story & characters\nD: Performance & optimization\n\nWhat's your Saturday focus? 🎨"
+        ]
+    else:
+        poll_types = [
+            f"Game dev approach for {poll_topic}? 🎮\nA: Focus on innovation\nB: Polish existing ideas\nC: Community-driven\nD: Solo creative vision\n\nWhat's your style? 👇",
+            f"Tech strategy for {poll_topic}? 💡\nA: Build fast & iterate\nB: Plan thoroughly first\nC: User feedback driven\nD: Vision-led development\n\nYour approach? ⬇️",
+            f"Indie dev priority with {poll_topic}? ⚡\nA: Unique mechanics\nB: Visual style\nC: Story/narrative\nD: Performance\n\nWhat comes first? 👇"
+        ]
     
     post_text = random.choice(poll_types)
     hashtags = generate_hashtags(poll_topic, 'poll')
@@ -606,24 +751,51 @@ def remove_ai_indicators(text):
     return ' '.join(text.split())
 
 def create_fallback_post(content_type):
-    """Create sophisticated fallback posts"""
+    """Create sophisticated fallback posts with seasonal awareness"""
     emojis = ["🚀", "🤔", "💡", "🎯", "🔥", "👀", "💭", "⚡"]
     
-    if content_type == 'tech':
-        fallbacks = [
-            f"Noticed something interesting in the tech space today {random.choice(emojis)} The way we're approaching development is really evolving. Anyone else seeing this shift?",
-            f"Had a thought about where tech is heading {random.choice(emojis)} Some of these new approaches could really change how we build things. What's catching your attention lately?"
-        ]
-    elif content_type == 'game dev':
-        fallbacks = [
-            f"Game dev thought of the day {random.choice(emojis)} The balance between innovation and polish is tougher than ever. Where do you lean?",
-            f"Watching how player expectations evolve {random.choice(emojis)} It's fascinating what matters to gamers now vs a few years ago. Anyone else tracking this?"
-        ]
+    # Check for special occasions
+    occasion = is_special_occasion()
+    day_name = datetime.now().strftime("%A").lower()
+    
+    if occasion == "christmas":
+        if content_type == 'tech':
+            fallbacks = [
+                f"🎄 Merry Christmas tech fam! Hope you're enjoying some well-deserved rest and maybe even some holiday coding sessions! What tech gifts surprised you this year?",
+                f"🎁 Christmas Day thoughts: The best tech innovations feel like magic. Wishing everyone a joyful holiday filled with inspiration and great ideas! 🎅"
+            ]
+        else:
+            fallbacks = [
+                f"🎄 Merry Christmas gamers & devs! Perfect day for some holiday gaming or cozy dev work. What's on your playlist today? 🎮",
+                f"🎁 Christmas vibes: There's something magical about games that bring people together during the holidays. Wishing everyone warm gaming sessions! ❄️"
+            ]
+    elif day_name == "saturday":
+        if content_type == 'game dev':
+            fallbacks = [
+                f"Happy #ScreenshotSaturday! Sharing some progress on my latest project today 🎮 What are you working on this weekend? Show your WIP! 👇",
+                f"#ScreenshotSaturday is here! Polishing up some game mechanics and level design today. Love seeing everyone's progress - share what you're creating! 🎨"
+            ]
+        else:
+            fallbacks = [
+                f"Saturday tech thoughts: Weekend coding sessions hit different ☕ What projects are you tinkering with today?",
+                f"Weekend vibes: Perfect time for some experimental coding or learning new tech. What's on your weekend dev list? 🚀"
+            ]
     else:
-        fallbacks = [
-            f"Interesting patterns in what's trending lately {random.choice(emojis)} Says a lot about where things might be heading. Your take?",
-            f"Noticed some shifts in the industry conversation {random.choice(emojis)} Some themes keep coming up that feel pretty significant. What are you observing?"
-        ]
+        if content_type == 'tech':
+            fallbacks = [
+                f"Noticed something interesting in the tech space today {random.choice(emojis)} The way we're approaching development is really evolving. Anyone else seeing this shift?",
+                f"Had a thought about where tech is heading {random.choice(emojis)} Some of these new approaches could really change how we build things. What's catching your attention lately?"
+            ]
+        elif content_type == 'game dev':
+            fallbacks = [
+                f"Game dev thought of the day {random.choice(emojis)} The balance between innovation and polish is tougher than ever. Where do you lean?",
+                f"Watching how player expectations evolve {random.choice(emojis)} It's fascinating what matters to gamers now vs a few years ago. Anyone else tracking this?"
+            ]
+        else:
+            fallbacks = [
+                f"Interesting patterns in what's trending lately {random.choice(emojis)} Says a lot about where things might be heading. Your take?",
+                f"Noticed some shifts in the industry conversation {random.choice(emojis)} Some themes keep coming up that feel pretty significant. What are you observing?"
+            ]
     
     post_text = random.choice(fallbacks)
     hashtags = generate_hashtags("industry trends", content_type)
@@ -636,10 +808,18 @@ def create_opinion_fallback(topic=None):
     if not topic:
         topic = "industry strategy"
     
-    poll_types = [
-        f"Game dev priority right now? 🎮\nA: Innovation & new ideas\nB: Polish & refinement\nC: Community building\nD: Business sustainability\n\nWhat's your focus? 👇",
-        f"Tech development approach? 💻\nA: Move fast & break things\nB: Build slow & solid\nC: User-driven iteration\nD: Vision-led creation\n\nYour style? ⬇️"
-    ]
+    day_name = datetime.now().strftime("%A").lower()
+    
+    if day_name == "saturday":
+        poll_types = [
+            f"#ScreenshotSaturday poll! What's your weekend focus? 🎮\nA: Visual polish & screenshots\nB: Gameplay mechanics\nC: Level design\nD: Bug fixing\n\nShare your progress! 👇",
+            f"Saturday game dev question! Working on:\nA: Art & visuals 🎨\nB: Code & systems 💻\nC: Design & levels 📐\nD: Sound & music 🎵\n\nWhat's your focus? 👇"
+        ]
+    else:
+        poll_types = [
+            f"Game dev priority right now? 🎮\nA: Innovation & new ideas\nB: Polish & refinement\nC: Community building\nD: Business sustainability\n\nWhat's your focus? 👇",
+            f"Tech development approach? 💻\nA: Move fast & break things\nB: Build slow & solid\nC: User-driven iteration\nD: Vision-led creation\n\nYour style? ⬇️"
+        ]
     
     post_text = random.choice(poll_types)
     hashtags = generate_hashtags(topic, 'poll')
@@ -670,10 +850,21 @@ def select_post_type():
 def main():
     print("🐦 Strategic Content Analyst - Twitter Edition")
     print("=" * 50)
-    print("📰 VARIED CONTENT • NO REPETITIVE AI POSTS")
-    print("🎮 MORE TECH/GAME DEV • LESS TRENDS")
+    print("📰 SEASONAL AWARENESS • DAY-SPECIFIC CONTENT")
+    print("🎮 #ScreenshotSaturday • HOLIDAY VIBES")
     print("🤖 USING GEMINI 2.0 FLASH")
     print("=" * 50)
+    
+    # Show current context
+    occasion = is_special_occasion()
+    season = get_season()
+    day_name = datetime.now().strftime("%A")
+    
+    print(f"📅 Today: {day_name}")
+    print(f"🌤️  Season: {season.title()}")
+    if occasion:
+        print(f"🎉 Special Occasion: {occasion.replace('_', ' ').title()}")
+    print("")
     
     # Validate configuration
     if not all([TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET]):
@@ -730,8 +921,11 @@ def main():
         print("\n✅ Strategic content successfully deployed!")
         print(f"🎯 Post type: {post_type.replace('_', ' ').title()}")
         print(f"🖼️ Image included: {'Yes' if image_url else 'No'}")
-        print("🚫 NO REPETITIVE AI POSTS")
-        print("🎮 MORE TECH/GAME DEV CONTENT")
+        print(f"📅 Seasonal context: {season.title()}")
+        if occasion:
+            print(f"🎉 Holiday vibes: {occasion.replace('_', ' ').title()}")
+        if day_name.lower() == 'saturday':
+            print("🖼️ #ScreenshotSaturday ready!")
     else:
         print("\n❌ Deployment failed.")
 
