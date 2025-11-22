@@ -834,10 +834,10 @@ def create_opinion_fallback(topic=None):
 def select_post_type():
     """Randomly select post type with weighted probability - more tech/game dev"""
     post_types = [
-        ('tech', 0.35),       # 35% tech posts (increased)
-        ('game_dev', 0.35),   # 35% game dev posts (increased)  
+        ('tech', 0.30),       # 35% tech posts (increased)
+        ('game_dev', 0.30),   # 35% game dev posts (increased)  
         ('trending', 0.25),   # 25% trending topics (reduced from 50%)
-        ('opinion_poll', 0.05) # 5% opinion polls (reduced)
+        ('opinion_poll', 0.15) # 5% opinion polls (reduced)
     ]
     
     choices, weights = zip(*post_types)
