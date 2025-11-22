@@ -1,4 +1,4 @@
-name: Twitter post1
+name: Twitter post1 >2
 
 on:
   schedule:
@@ -32,4 +32,4 @@ jobs:
         TWITTER_ACCESS_TOKEN_SECRET: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       run: |
-        python post1.py
+        python post2.py
