@@ -227,28 +227,40 @@ def post_to_twitter(content, api_key, api_secret, access_token, access_token_sec
         if image_url:
             print(f"📤 Uploading media from {image_url}...")
             
+            # Clean up image URL
+            clean_image_url = image_url.split('?')[0].split('&#')[0]
+            
             # Use v1.1 API for media upload (this is allowed on Free tier)
             auth_v1 = tweepy.OAuthHandler(api_key, api_secret)
             auth_v1.set_access_token(access_token, access_token_secret)
             api_v1 = tweepy.API(auth_v1)
             
             # Download image and upload
-            response = requests.get(image_url, timeout=30)
-            response.raise_for_status()
-            
-            # Save temporarily
-            temp_file = "/tmp/tweet_image.jpg"
-            with open(temp_file, "wb") as f:
-                f.write(response.content)
-            
-            media = api_v1.media_upload(filename=temp_file)
-            media_ids.append(media.media_id_string)
-            
-            # Clean up
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
+            try:
+                response = requests.get(clean_image_url, timeout=30)
+                response.raise_for_status()
                 
-            print(f"✅ Media uploaded successfully! ID: {media.media_id_string}")
+                # Save temporarily
+                temp_file = "/tmp/tweet_image.jpg"
+                with open(temp_file, "wb") as f:
+                    f.write(response.content)
+                
+                # Check file size
+                file_size = os.path.getsize(temp_file)
+                if file_size > 5 * 1024 * 1024:  # 5MB limit
+                    print(f"⚠️ Image too large ({file_size} bytes), skipping...")
+                else:
+                    media = api_v1.media_upload(filename=temp_file)
+                    media_ids.append(media.media_id_string)
+                    print(f"✅ Media uploaded successfully! ID: {media.media_id_string}")
+                
+                # Clean up
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+                    
+            except Exception as e:
+                print(f"⚠️ Failed to download/upload image: {e}")
+                # Continue without image
         
         # --- CREATE TWEET (using v2) ---
         client_v2 = tweepy.Client(
@@ -586,36 +598,42 @@ def get_post_style_prompt(style, topic, content_type):
         Create a warm, enthusiastic tweet about {topic}. Sound like an excited friend sharing cool news!
         Use natural, conversational language with emojis. Be genuinely excited about this {content_type} development.
         Keep it under 180 characters. Make it feel like you're chatting with friends.
+        DO NOT start with greetings like "Hey friends" or "Hello everyone" - jump straight into the content.
         """,
         
         "curious_friend": f"""
         Write a curious, friendly tweet about {topic}. Sound like you're genuinely interested and want to learn together.
         Ask open questions that invite discussion. Use warm, approachable language.
         Keep it under 180 characters. Be authentically curious and friendly.
+        DO NOT start with greetings like "Hey friends" or "Hello everyone" - jump straight into the content.
         """,
         
         "helpful_techie": f"""
         Share a helpful insight about {topic}. Sound like a friendly expert who wants to help others understand.
         Break it down in simple terms. Be encouraging and supportive of others in the {content_type} community.
         Keep it under 180 characters. Be helpful without being condescending.
+        DO NOT start with greetings like "Hey friends" or "Hello everyone" - jump straight into the content.
         """,
         
         "excited_gamer": f"""
         Write an excited, passionate tweet about {topic}. Show genuine gaming enthusiasm!
         Sound like you just found something awesome and can't wait to share it with your gaming friends.
         Keep it under 180 characters. Be energetic and positive.
+        DO NOT start with greetings like "Hey friends" or "Hello everyone" - jump straight into the content.
         """,
         
         "thoughtful_buddy": f"""
         Share a thoughtful observation about {topic}. Sound like a friend having a deep conversation over coffee.
         Be reflective but warm. Show you care about the {content_type} community and its direction.
         Keep it under 180 characters. Be insightful but approachable.
+        DO NOT start with greetings like "Hey friends" or "Hello everyone" - jump straight into the content.
         """,
         
         "creative_mind": f"""
         Share a creative perspective on {topic}. Sound inspired and imaginative!
         Talk about possibilities and creative potential in the {content_type} space.
         Keep it under 180 characters. Be visionary but grounded.
+        DO NOT start with greetings like "Hey friends" or "Hello everyone" - jump straight into the content.
         """
     }
     
@@ -699,6 +717,7 @@ def generate_tech_analysis_post(articles):
     - Make it feel like a real conversation starter
     - Keep it warm, approachable, and engaging
     - DO NOT use any markdown formatting (no *, _, ~, etc.)
+    - DO NOT start with greetings like "Hey friends" or "Hello everyone"
 
     Return ONLY the post text (without hashtags).
     """
@@ -750,6 +769,7 @@ def generate_game_dev_post(articles):
     - Make it feel like you're chatting in a game dev Discord server
     - Include gaming-related emojis where appropriate
     - DO NOT use any markdown formatting (no *, _, ~, etc.)
+    - DO NOT start with greetings like "Hey friends" or "Hello everyone"
 
     Return ONLY the post text (without hashtags).
     """
@@ -791,6 +811,7 @@ def generate_trending_topic_post(trends):
     - Be the friend who spots cool trends and wants to talk about them
     - Avoid sounding like a trend-chasing bot or marketer
     - DO NOT use any markdown formatting (no *, _, ~, etc.)
+    - DO NOT start with greetings like "Hey friends" or "Hello everyone"
 
     Return ONLY the post text (without hashtags).
     """
@@ -825,8 +846,8 @@ def generate_trend_based_opinion_poll(trends):
         ]
     else:
         poll_types = [
-            f"Quick game dev question for my friends! For {poll_topic}, what's your approach? 🎮\nA: Focus on innovation & new ideas\nB: Polish existing ideas to perfection\nC: Community-driven development\nD: Solo creative vision\n\nWhat's your style? Tell me below! 👇",
-            f"Hey tech friends! Strategy question about {poll_topic}: 💡\nA: Build fast & iterate quickly\nB: Plan thoroughly first\nC: User feedback driven\nD: Vision-led development\n\nYour preferred approach? Would love to know! 💭",
+            f"Quick game dev question! For {poll_topic}, what's your approach? 🎮\nA: Focus on innovation & new ideas\nB: Polish existing ideas to perfection\nC: Community-driven development\nD: Solo creative vision\n\nWhat's your style? Tell me below! 👇",
+            f"Strategy question about {poll_topic}: 💡\nA: Build fast & iterate quickly\nB: Plan thoroughly first\nC: User feedback driven\nD: Vision-led development\n\nYour preferred approach? Would love to know! 💭",
             f"Indie dev crew! With {poll_topic}, what's your priority? ⚡\nA: Unique mechanics that stand out\nB: Killer visual style & art\nC: Compelling story/narrative\nD: Rock-solid performance\n\nWhat comes first for you? Share your thoughts! 🚀"
         ]
     
@@ -911,7 +932,7 @@ def remove_ai_indicators(text):
     return ' '.join(text.split())
 
 def create_fallback_post(content_type):
-    """Create friendly fallback posts with seasonal awareness"""
+    """Create friendly fallback posts with seasonal awareness - NO GREETINGS"""
     emojis = ["🚀", "🤔", "💡", "🎯", "🔥", "👀", "💭", "⚡", "🌟", "✨", "🎮", "💻"]
     
     # Check for special occasions
@@ -921,40 +942,40 @@ def create_fallback_post(content_type):
     if occasion == "christmas":
         if content_type == 'tech':
             fallbacks = [
-                f"🎄 Merry Christmas tech fam! Hope you're enjoying some well-deserved rest and maybe even some cozy holiday coding sessions! What tech gifts surprised you this year? 🎁",
-                f"🎁 Christmas Day thoughts with my tech friends: The best innovations feel like magic. Wishing everyone a joyful holiday filled with inspiration! 🎅"
+                f"🎄 Christmas coding sessions just hit different! Perfect time for some cozy dev work with holiday vibes 🎁 What tech projects are you tinkering with?",
+                f"🎁 The best tech innovations feel like pure magic during the holidays! Wishing everyone inspiration and great ideas this season 🎅"
             ]
         else:
             fallbacks = [
-                f"🎄 Merry Christmas gamers & devs! Perfect day for some holiday gaming or cozy dev work. What's on your playlist today? 🎮",
-                f"🎁 Christmas vibes with the gaming crew! There's something magical about games that bring people together during the holidays. What's your favorite holiday gaming memory? ❄️"
+                f"🎄 Holiday gaming sessions are the best! Perfect day for some cozy gaming or creative dev work 🎮 What's on your playlist today?",
+                f"🎁 There's something magical about games that bring people together during the holidays! Wishing everyone warm gaming sessions ❄️"
             ]
     elif day_name == "saturday":
         if content_type == 'game dev':
             fallbacks = [
-                f"Happy #ScreenshotSaturday friends! 🎮 Sharing some progress on my latest project today - feeling excited about how it's coming together! What are you working on this weekend? Show your WIP! 👇",
-                f"#ScreenshotSaturday is here! 🎨 Polishing up some game mechanics and level design today. Love seeing everyone's progress - this community is so inspiring! What creative projects are you excited about right now? 💫"
+                f"#ScreenshotSaturday progress! Working on some exciting game mechanics today 🎮 Love seeing everyone's creative projects - what are you building this weekend?",
+                f"Saturday game dev sessions are the best! Polishing up some level design and loving the community energy 🎨 What creative projects are you excited about?"
             ]
         else:
             fallbacks = [
-                f"Saturday tech thoughts with friends ☕ Weekend coding sessions just hit different, don't they? What projects are you tinkering with today? Would love to hear what you're building! 🚀",
-                f"Weekend vibes! 🌟 Perfect time for some experimental coding or learning new tech with friends. What's on your weekend dev list? I'm always looking for new inspiration! 💡"
+                f"Weekend coding sessions just hit different ☕ Perfect time for experimental projects and learning new tech - what are you building today?",
+                f"Saturday tech experiments are my favorite! Trying out some new frameworks and loving the creative energy 🚀 What's on your weekend dev list?"
             ]
     else:
         if content_type == 'tech':
             fallbacks = [
-                f"Hey tech friends! 👋 Noticed something interesting in the tech space today {random.choice(emojis)} The way we're approaching development is really evolving. Anyone else seeing this shift?",
-                f"Had a thought about where tech is heading that I wanted to share with you all {random.choice(emojis)} Some of these new approaches could really change how we build things together. What's catching your attention lately?"
+                f"Noticed something interesting in the tech space today {random.choice(emojis)} The way we're approaching development is really evolving - anyone else seeing this shift?",
+                f"The future of tech development looks wild {random.choice(emojis)} Some of these new approaches could really change how we build things together"
             ]
         elif content_type == 'game dev':
             fallbacks = [
-                f"Game dev thought of the day for my fellow creators {random.choice(emojis)} The balance between innovation and polish is tougher than ever. Where do you lean with your projects?",
-                f"Hey game dev friends! 🎮 Watching how player expectations evolve is fascinating {random.choice(emojis)} It's amazing what matters to gamers now vs a few years ago. Anyone else tracking this? What changes are you seeing?"
+                f"Game dev thought of the day {random.choice(emojis)} The balance between innovation and polish is tougher than ever - where do you lean with your projects?",
+                f"Watching player expectations evolve is fascinating {random.choice(emojis)} It's amazing what matters to gamers now vs a few years ago - anyone else tracking this?"
             ]
         else:
             fallbacks = [
-                f"Hey everyone! 👋 Noticed some interesting patterns in what's trending lately {random.choice(emojis)} Says a lot about where things might be heading together. Your take on these trends?",
-                f"Friends! 🌟 Noticed some shifts in our industry conversation that feel pretty significant {random.choice(emojis)} Some themes keep coming up that could really shape where we're headed. What are you observing in your corner of the world?"
+                f"Interesting patterns in what's trending lately {random.choice(emojis)} Says a lot about where things might be heading together",
+                f"Noticed some shifts in the industry conversation that feel pretty significant {random.choice(emojis)} Some themes keep coming up that could really shape where we're headed"
             ]
     
     post_text = random.choice(fallbacks)
@@ -979,13 +1000,13 @@ def create_opinion_fallback(topic=None):
     
     if day_name == "saturday":
         poll_types = [
-            f"#ScreenshotSaturday poll for my dev friends! 🎮 What's your weekend focus?\nA: Visual polish & screenshots\nB: Gameplay mechanics\nC: Level design\nD: Bug fixing\n\nShare your progress below - love seeing what everyone's creating! 👇 {generate_hashtags('ScreenshotSaturday', 'poll')}",
-            f"Saturday game dev question for the crew! 🎨 Working on:\nA: Art & visuals 🖌️\nB: Code & systems 💻\nC: Design & levels 📐\nD: Sound & music 🎵\n\nWhat's your focus this fine Saturday? Tell me about your project! 💫 {generate_hashtags('GameDev', 'poll')}"
+            f"#ScreenshotSaturday poll! What's your weekend focus? 🎮\nA: Visual polish & screenshots\nB: Gameplay mechanics\nC: Level design\nD: Bug fixing\n\nShare your progress below! 👇 {generate_hashtags('ScreenshotSaturday', 'poll')}",
+            f"Saturday game dev question! Working on:\nA: Art & visuals 🖌️\nB: Code & systems 💻\nC: Design & levels 📐\nD: Sound & music 🎵\n\nWhat's your focus today? 💫 {generate_hashtags('GameDev', 'poll')}"
         ]
     else:
         poll_types = [
-            f"Quick question for my game dev friends! 🎮 What's your priority right now?\nA: Innovation & new ideas\nB: Polish & refinement\nC: Community building\nD: Business sustainability\n\nWhat's your current focus? Would love to know how everyone's approaching their work! 👇 {generate_hashtags('GameDev', 'poll')}",
-            f"Hey tech friends! 💻 Quick poll about development approach:\nA: Move fast & break things\nB: Build slow & solid\nC: User-driven iteration\nD: Vision-led creation\n\nYour preferred style? Always curious how others work! ⬇️ {generate_hashtags('Tech', 'poll')}"
+            f"Game dev priority right now? 🎮\nA: Innovation & new ideas\nB: Polish & refinement\nC: Community building\nD: Business sustainability\n\nWhat's your current focus? 👇 {generate_hashtags('GameDev', 'poll')}",
+            f"Tech development approach? 💻\nA: Move fast & break things\nB: Build slow & solid\nC: User-driven iteration\nD: Vision-led creation\n\nYour preferred style? ⬇️ {generate_hashtags('Tech', 'poll')}"
         ]
     
     post_text = random.choice(poll_types)
