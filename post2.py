@@ -57,25 +57,6 @@ POST_STYLES = [
     "creative_mind"
 ]
 
-# Friendly CTAs to encourage conversation
-CONVERSATION_STARTERS = [
-    "What do you think? 👀",
-    "Your take on this? 💭",
-    "Would love to hear your thoughts! 🗣️",
-    "What's your experience with this? 🤔",
-    "Curious what you all think! 🎯",
-    "Let's chat about this! 💬",
-    "Your perspective? 🌟",
-    "What's your take, friends? 👇",
-    "Jump in the comments! 🚀",
-    "Tell me I'm wrong! 😄",
-    "What am I missing here? 🧠",
-    "Your thoughts? Let's discuss! 💫",
-    "Agree or disagree? 🤷‍♂️",
-    "What's your hot take? 🔥",
-    "Let's hear your opinion! 🎤"
-]
-
 # ================================
 # SEASONAL & TIME AWARENESS FUNCTIONS
 # ================================
@@ -232,6 +213,9 @@ def post_to_twitter(content, api_key, api_secret, access_token, access_token_sec
     """Post content to Twitter/X with optional image using the correct API versions"""
     try:
         print("🐦 Posting to Twitter/X...")
+        
+        # Remove any Markdown formatting
+        content = remove_markdown_formatting(content)
         
         # Ensure content is within Twitter limits
         if len(content) > 280:
@@ -459,7 +443,6 @@ def generate_hashtags(topic, content_type):
     """
     
     try:
-        # Updated for Gemini 2.0 Flash
         response = requests.post(
             "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent",
             params={"key": GEMINI_API_KEY},
@@ -488,6 +471,109 @@ def generate_hashtags(topic, content_type):
         return f"{base_hashtags} {seasonal_hashtags} {day_hashtags} {occasion_hashtags}"
     else:
         return f"{base_hashtags} {seasonal_hashtags} {day_hashtags}"
+
+def generate_contextual_cta(post_text, topic):
+    """Generate a relevant CTA based on the post content"""
+    prompt = f"""
+    Based on this Twitter post about "{topic}":
+    
+    "{post_text}"
+    
+    Create ONE engaging, conversational call-to-action that:
+    - Directly relates to the post content
+    - Encourages comments and discussion
+    - Sounds natural and friendly
+    - Is specific to the topic (e.g., if it's about GTA, ask what people are excited about)
+    - Uses casual, conversational language
+    - Is under 40 characters
+    
+    Return ONLY the CTA text (no quotes, no explanation).
+    
+    Examples:
+    - "What feature are you most excited about?"
+    - "Your favorite moment from this game?"
+    - "What would you improve here?"
+    - "Seen any cool alternatives?"
+    - "Your take on this trend?"
+    """
+    
+    try:
+        response = requests.post(
+            "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent",
+            params={"key": GEMINI_API_KEY},
+            headers={"Content-Type": "application/json"},
+            json={"contents": [{"parts": [{"text": prompt}]}]},
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "candidates" in data and data["candidates"]:
+                cta = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                cta = cta.replace('"', '').replace("'", "").strip()
+                print(f"💬 AI-generated CTA: {cta}")
+                return cta
+    except Exception as e:
+        print(f"❌ CTA generation error: {e}")
+    
+    # Fallback CTAs
+    fallback_ctas = [
+        "What do you think? 👀",
+        "Your take on this? 💭",
+        "Would love to hear your thoughts! 🗣️",
+        "What's your experience with this? 🤔"
+    ]
+    return random.choice(fallback_ctas)
+
+def quality_check_post(post_text, topic, content_type):
+    """AI quality check to ensure posts make sense and are appropriate"""
+    prompt = f"""
+    Analyze this Twitter post about {topic} (content type: {content_type}):
+    
+    "{post_text}"
+    
+    Evaluate it on these criteria:
+    1. Does it make logical sense?
+    2. Is it factually reasonable (not making false claims)?
+    3. Is the tone friendly and conversational?
+    4. Is it free of markdown formatting and proper for Twitter?
+    5. Is it engaging and likely to start conversations?
+    
+    Respond with ONLY "APPROVED" if it passes all criteria, or "REJECTED" if it fails any.
+    If rejected, provide a brief reason after "REJECTED: ".
+    """
+    
+    try:
+        response = requests.post(
+            "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent",
+            params={"key": GEMINI_API_KEY},
+            headers={"Content-Type": "application/json"},
+            json={"contents": [{"parts": [{"text": prompt}]}]},
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "candidates" in data and data["candidates"]:
+                result = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                print(f"🔍 Quality check result: {result}")
+                return "APPROVED" in result.upper(), result
+    except Exception as e:
+        print(f"❌ Quality check error: {e}")
+    
+    # If quality check fails, default to approved to avoid blocking all posts
+    return True, "Auto-approved due to check error"
+
+def remove_markdown_formatting(text):
+    """Remove Markdown formatting from text"""
+    # Remove bold/italic markers
+    text = re.sub(r'\*{1,3}(.*?)\*{1,3}', r'\1', text)
+    # Remove other Markdown symbols
+    text = re.sub(r'#{1,6}\s?', '', text)  # headers
+    text = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', text)  # links
+    text = re.sub(r'`{1,3}(.*?)`{1,3}', r'\1', text)  # code
+    text = re.sub(r'~{2}(.*?)~{2}', r'\1', text)  # strikethrough
+    return text.strip()
 
 def get_post_style_prompt(style, topic, content_type):
     """Get different writing styles for variety with seasonal awareness - UPDATED FOR FRIENDLY TONE"""
@@ -560,13 +646,13 @@ def get_post_style_prompt(style, topic, content_type):
     
     return base_prompt
 
-def add_conversation_starter(post_text):
-    """Add a friendly CTA to encourage comments and discussion"""
+def add_conversation_starter(post_text, topic):
+    """Add a relevant AI-generated CTA to encourage comments and discussion"""
     # Remove any existing punctuation at the end
     post_text = post_text.rstrip('.,!?')
     
-    # Add a random conversation starter
-    cta = random.choice(CONVERSATION_STARTERS)
+    # Generate contextual CTA
+    cta = generate_contextual_cta(post_text, topic)
     
     # Ensure we don't exceed character limit
     new_text = f"{post_text} {cta}"
@@ -612,6 +698,7 @@ def generate_tech_analysis_post(articles):
     - Avoid corporate speak or overly technical jargon
     - Make it feel like a real conversation starter
     - Keep it warm, approachable, and engaging
+    - DO NOT use any markdown formatting (no *, _, ~, etc.)
 
     Return ONLY the post text (without hashtags).
     """
@@ -619,7 +706,7 @@ def generate_tech_analysis_post(articles):
     post_text = generate_ai_content(prompt, selected_articles, 'tech', main_topic)
     
     # Add conversation starter
-    post_text = add_conversation_starter(post_text)
+    post_text = add_conversation_starter(post_text, main_topic)
     
     return post_text, image_url
 
@@ -662,6 +749,7 @@ def generate_game_dev_post(articles):
     - Be encouraging and supportive of other developers
     - Make it feel like you're chatting in a game dev Discord server
     - Include gaming-related emojis where appropriate
+    - DO NOT use any markdown formatting (no *, _, ~, etc.)
 
     Return ONLY the post text (without hashtags).
     """
@@ -669,7 +757,7 @@ def generate_game_dev_post(articles):
     post_text = generate_ai_content(prompt, selected_articles, 'game dev', main_topic)
     
     # Add conversation starter
-    post_text = add_conversation_starter(post_text)
+    post_text = add_conversation_starter(post_text, main_topic)
     
     return post_text, image_url
 
@@ -702,6 +790,7 @@ def generate_trending_topic_post(trends):
     - Use casual, conversational language that invites discussion
     - Be the friend who spots cool trends and wants to talk about them
     - Avoid sounding like a trend-chasing bot or marketer
+    - DO NOT use any markdown formatting (no *, _, ~, etc.)
 
     Return ONLY the post text (without hashtags).
     """
@@ -709,7 +798,7 @@ def generate_trending_topic_post(trends):
     post_text = generate_ai_content(prompt, trends, 'trending', main_topic)
     
     # Add conversation starter
-    post_text = add_conversation_starter(post_text)
+    post_text = add_conversation_starter(post_text, main_topic)
     
     return post_text, None
 
@@ -748,43 +837,61 @@ def generate_trend_based_opinion_poll(trends):
     print(f"✅ Friendly opinion poll created ({len(post_text)} chars)")
     return post_text
 
-def generate_ai_content(prompt, content, content_type, main_topic):
-    """Generate content using AI and add AI-powered hashtags"""
-    try:
-        print(f"🎭 Generating {content_type} post...")
-        
-        # Updated for Gemini 2.0 Flash
-        response = requests.post(
-            "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent",
-            params={"key": GEMINI_API_KEY},
-            headers={"Content-Type": "application/json"},
-            json={"contents": [{"parts": [{"text": prompt}]}]},
-            timeout=30
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            if "candidates" in data and data["candidates"]:
-                post_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                post_text = post_text.replace('```', '').strip()
-                
-                # Add AI-generated hashtags for all post types
-                hashtags = generate_hashtags(main_topic, content_type)
-                post_text += f" {hashtags}"
-                
-                post_text = remove_ai_indicators(post_text)
-                
-                # Final length check and truncation if needed
-                if len(post_text) > 280:
-                    post_text = post_text[:277] + "..."
-                
-                print(f"✅ {content_type.title()} post created ({len(post_text)} chars)")
-                return post_text
-        else:
-            print(f"❌ AI generation error: {response.text}")
+def generate_ai_content(prompt, content, content_type, main_topic, max_retries=2):
+    """Generate content using AI with quality checks and retries"""
+    for attempt in range(max_retries + 1):
+        try:
+            print(f"🎭 Generating {content_type} post (attempt {attempt + 1})...")
             
-    except Exception as e:
-        print(f"❌ {content_type} generation error: {e}")
+            response = requests.post(
+                "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent",
+                params={"key": GEMINI_API_KEY},
+                headers={"Content-Type": "application/json"},
+                json={"contents": [{"parts": [{"text": prompt}]}]},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if "candidates" in data and data["candidates"]:
+                    post_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    post_text = post_text.replace('```', '').strip()
+                    
+                    # Remove any Markdown formatting
+                    post_text = remove_markdown_formatting(post_text)
+                    
+                    # Add AI-generated hashtags for all post types
+                    hashtags = generate_hashtags(main_topic, content_type)
+                    post_text += f" {hashtags}"
+                    
+                    post_text = remove_ai_indicators(post_text)
+                    
+                    # Quality check the post
+                    is_approved, reason = quality_check_post(post_text, main_topic, content_type)
+                    
+                    if is_approved:
+                        # Final length check and truncation if needed
+                        if len(post_text) > 280:
+                            post_text = post_text[:277] + "..."
+                        
+                        print(f"✅ {content_type.title()} post created ({len(post_text)} chars)")
+                        return post_text
+                    else:
+                        print(f"❌ Post rejected: {reason}")
+                        if attempt < max_retries:
+                            print("🔄 Retrying with different approach...")
+                            continue
+                        else:
+                            print("❌ Max retries reached, using fallback")
+                            return create_fallback_post(content_type)
+            else:
+                print(f"❌ AI generation error: {response.text}")
+                
+        except Exception as e:
+            print(f"❌ {content_type} generation error: {e}")
+            if attempt < max_retries:
+                print("🔄 Retrying...")
+                continue
     
     return create_fallback_post(content_type)
 
@@ -814,43 +921,48 @@ def create_fallback_post(content_type):
     if occasion == "christmas":
         if content_type == 'tech':
             fallbacks = [
-                f"🎄 Merry Christmas tech fam! Hope you're enjoying some well-deserved rest and maybe even some cozy holiday coding sessions! What tech gifts surprised you this year? 🎁 {random.choice(CONVERSATION_STARTERS)}",
-                f"🎁 Christmas Day thoughts with my tech friends: The best innovations feel like magic. Wishing everyone a joyful holiday filled with inspiration! 🎅 What's your favorite tech magic moment? {random.choice(CONVERSATION_STARTERS)}"
+                f"🎄 Merry Christmas tech fam! Hope you're enjoying some well-deserved rest and maybe even some cozy holiday coding sessions! What tech gifts surprised you this year? 🎁",
+                f"🎁 Christmas Day thoughts with my tech friends: The best innovations feel like magic. Wishing everyone a joyful holiday filled with inspiration! 🎅"
             ]
         else:
             fallbacks = [
-                f"🎄 Merry Christmas gamers & devs! Perfect day for some holiday gaming or cozy dev work. What's on your playlist today? 🎮 {random.choice(CONVERSATION_STARTERS)}",
-                f"🎁 Christmas vibes with the gaming crew! There's something magical about games that bring people together during the holidays. What's your favorite holiday gaming memory? ❄️ {random.choice(CONVERSATION_STARTERS)}"
+                f"🎄 Merry Christmas gamers & devs! Perfect day for some holiday gaming or cozy dev work. What's on your playlist today? 🎮",
+                f"🎁 Christmas vibes with the gaming crew! There's something magical about games that bring people together during the holidays. What's your favorite holiday gaming memory? ❄️"
             ]
     elif day_name == "saturday":
         if content_type == 'game dev':
             fallbacks = [
-                f"Happy #ScreenshotSaturday friends! 🎮 Sharing some progress on my latest project today - feeling excited about how it's coming together! What are you working on this weekend? Show your WIP! 👇 {generate_hashtags('game development', 'game dev')}",
-                f"#ScreenshotSaturday is here! 🎨 Polishing up some game mechanics and level design today. Love seeing everyone's progress - this community is so inspiring! What creative projects are you excited about right now? 💫 {generate_hashtags('game development', 'game dev')}"
+                f"Happy #ScreenshotSaturday friends! 🎮 Sharing some progress on my latest project today - feeling excited about how it's coming together! What are you working on this weekend? Show your WIP! 👇",
+                f"#ScreenshotSaturday is here! 🎨 Polishing up some game mechanics and level design today. Love seeing everyone's progress - this community is so inspiring! What creative projects are you excited about right now? 💫"
             ]
         else:
             fallbacks = [
-                f"Saturday tech thoughts with friends ☕ Weekend coding sessions just hit different, don't they? What projects are you tinkering with today? Would love to hear what you're building! 🚀 {generate_hashtags('tech', 'tech')}",
-                f"Weekend vibes! 🌟 Perfect time for some experimental coding or learning new tech with friends. What's on your weekend dev list? I'm always looking for new inspiration! 💡 {generate_hashtags('tech', 'tech')}"
+                f"Saturday tech thoughts with friends ☕ Weekend coding sessions just hit different, don't they? What projects are you tinkering with today? Would love to hear what you're building! 🚀",
+                f"Weekend vibes! 🌟 Perfect time for some experimental coding or learning new tech with friends. What's on your weekend dev list? I'm always looking for new inspiration! 💡"
             ]
     else:
         if content_type == 'tech':
             fallbacks = [
-                f"Hey tech friends! 👋 Noticed something interesting in the tech space today {random.choice(emojis)} The way we're approaching development is really evolving. Anyone else seeing this shift? {random.choice(CONVERSATION_STARTERS)} {generate_hashtags('tech trends', 'tech')}",
-                f"Had a thought about where tech is heading that I wanted to share with you all {random.choice(emojis)} Some of these new approaches could really change how we build things together. What's catching your attention lately? {random.choice(CONVERSATION_STARTERS)} {generate_hashtags('tech innovation', 'tech')}"
+                f"Hey tech friends! 👋 Noticed something interesting in the tech space today {random.choice(emojis)} The way we're approaching development is really evolving. Anyone else seeing this shift?",
+                f"Had a thought about where tech is heading that I wanted to share with you all {random.choice(emojis)} Some of these new approaches could really change how we build things together. What's catching your attention lately?"
             ]
         elif content_type == 'game dev':
             fallbacks = [
-                f"Game dev thought of the day for my fellow creators {random.choice(emojis)} The balance between innovation and polish is tougher than ever. Where do you lean with your projects? {random.choice(CONVERSATION_STARTERS)} {generate_hashtags('game development', 'game dev')}",
-                f"Hey game dev friends! 🎮 Watching how player expectations evolve is fascinating {random.choice(emojis)} It's amazing what matters to gamers now vs a few years ago. Anyone else tracking this? What changes are you seeing? {random.choice(CONVERSATION_STARTERS)} {generate_hashtags('gaming industry', 'game dev')}"
+                f"Game dev thought of the day for my fellow creators {random.choice(emojis)} The balance between innovation and polish is tougher than ever. Where do you lean with your projects?",
+                f"Hey game dev friends! 🎮 Watching how player expectations evolve is fascinating {random.choice(emojis)} It's amazing what matters to gamers now vs a few years ago. Anyone else tracking this? What changes are you seeing?"
             ]
         else:
             fallbacks = [
-                f"Hey everyone! 👋 Noticed some interesting patterns in what's trending lately {random.choice(emojis)} Says a lot about where things might be heading together. Your take on these trends? {random.choice(CONVERSATION_STARTERS)} {generate_hashtags('industry trends', 'trending')}",
-                f"Friends! 🌟 Noticed some shifts in our industry conversation that feel pretty significant {random.choice(emojis)} Some themes keep coming up that could really shape where we're headed. What are you observing in your corner of the world? {random.choice(CONVERSATION_STARTERS)} {generate_hashtags('industry news', 'trending')}"
+                f"Hey everyone! 👋 Noticed some interesting patterns in what's trending lately {random.choice(emojis)} Says a lot about where things might be heading together. Your take on these trends?",
+                f"Friends! 🌟 Noticed some shifts in our industry conversation that feel pretty significant {random.choice(emojis)} Some themes keep coming up that could really shape where we're headed. What are you observing in your corner of the world?"
             ]
     
     post_text = random.choice(fallbacks)
+    hashtags = generate_hashtags("industry trends", content_type)
+    post_text += f" {hashtags}"
+    
+    # Add contextual CTA
+    post_text = add_conversation_starter(post_text, "industry trends")
     
     # Ensure we don't exceed character limit
     if len(post_text) > 280:
@@ -959,7 +1071,7 @@ def main():
         post_text = generate_trend_based_opinion_poll(trends)
         image_url = None
     
-    print(f"📝 Post: {post_text}")
+    print(f"📝 Final Post: {post_text}")
     print(f"📏 Character count: {len(post_text)}")
     print(f"🖼️ Image available: {'Yes' if image_url else 'No'}")
     
@@ -983,7 +1095,7 @@ def main():
             print(f"🎉 Holiday vibes: {occasion.replace('_', ' ').title()}")
         if day_name.lower() == 'saturday':
             print("🖼️ #ScreenshotSaturday ready!")
-        print("💬 Conversation starter: Included!")
+        print("💬 Contextual CTA: Included!")
     else:
         print("\n❌ Failed to share.")
 
