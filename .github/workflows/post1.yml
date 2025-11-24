@@ -1,10 +1,12 @@
-name: Twitter post1 >2
+name: Science Twitter Bot - USA Optimized
 
 on:
   schedule:
-    # Runs at 9 AM, 12 PM, and 3 PM UTC (which is 4 AM, 7 AM, and 10 AM EST, or 1 AM, 4 AM, and 7 AM PST)
-    # Adjust these UTC times to match your desired US time slots.
-    - cron: '0 9,12,15 * * *' 
+    # Runs at 2:00 PM and 9:00 PM UTC
+    # Converts to:
+    # 2:00 PM UTC = 9:00 AM EST / 6:00 AM PST (Morning engagement)
+    # 9:00 PM UTC = 4:00 PM EST / 1:00 PM PST (Afternoon engagement)
+    - cron: '0 15,23 * * *'
   workflow_dispatch: # Allows manual triggering
 
 jobs:
