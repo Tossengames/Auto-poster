@@ -2,11 +2,10 @@ name: Science Twitter Bot
 
 on:
   schedule:
-    # Run 3 times per day at USA times (UTC conversion)
-    # 9:00 AM EST = 14:00 UTC
-    # 2:00 PM EST = 19:00 UTC  
-    # 7:00 PM EST = 00:00 UTC (next day)
-    - cron: '0 14,19,0 * * *'
+    # Run 2 times per day at optimal USA times
+    # 9:00 AM EST = 14:00 UTC (morning engagement)
+    # 3:00 PM EST = 20:00 UTC (afternoon engagement)
+    - cron: '0 14,20 * * *'
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
