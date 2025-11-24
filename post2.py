@@ -214,9 +214,6 @@ def post_to_twitter(content, api_key, api_secret, access_token, access_token_sec
     try:
         print("🐦 Posting to Twitter/X...")
         
-        # Remove any Markdown formatting
-        content = remove_markdown_formatting(content)
-        
         # Ensure content is within Twitter limits
         if len(content) > 280:
             print(f"📏 Content too long ({len(content)} chars), truncating...")
@@ -548,7 +545,7 @@ def quality_check_post(post_text, topic, content_type):
     1. Does it make logical sense?
     2. Is it factually reasonable (not making false claims)?
     3. Is the tone friendly and conversational?
-    4. Is it free of markdown formatting and proper for Twitter?
+    4. Is it free of markdown formatting (like *bold*, _italic_, etc.) and proper for Twitter?
     5. Is it engaging and likely to start conversations?
     
     Respond with ONLY "APPROVED" if it passes all criteria, or "REJECTED" if it fails any.
@@ -576,17 +573,6 @@ def quality_check_post(post_text, topic, content_type):
     # If quality check fails, default to approved to avoid blocking all posts
     return True, "Auto-approved due to check error"
 
-def remove_markdown_formatting(text):
-    """Remove Markdown formatting from text"""
-    # Remove bold/italic markers
-    text = re.sub(r'\*{1,3}(.*?)\*{1,3}', r'\1', text)
-    # Remove other Markdown symbols
-    text = re.sub(r'#{1,6}\s?', '', text)  # headers
-    text = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', text)  # links
-    text = re.sub(r'`{1,3}(.*?)`{1,3}', r'\1', text)  # code
-    text = re.sub(r'~{2}(.*?)~{2}', r'\1', text)  # strikethrough
-    return text.strip()
-
 def get_post_style_prompt(style, topic, content_type):
     """Get different writing styles for variety with seasonal awareness - UPDATED FOR FRIENDLY TONE"""
     occasion = is_special_occasion()
@@ -599,6 +585,7 @@ def get_post_style_prompt(style, topic, content_type):
         Use natural, conversational language with emojis. Be genuinely excited about this {content_type} development.
         Keep it under 180 characters. Make it feel like you're chatting with friends.
         DO NOT start with greetings like "Hey friends" or "Hello everyone" - jump straight into the content.
+        DO NOT use any markdown formatting like *bold* or _italic_ text.
         """,
         
         "curious_friend": f"""
@@ -606,6 +593,7 @@ def get_post_style_prompt(style, topic, content_type):
         Ask open questions that invite discussion. Use warm, approachable language.
         Keep it under 180 characters. Be authentically curious and friendly.
         DO NOT start with greetings like "Hey friends" or "Hello everyone" - jump straight into the content.
+        DO NOT use any markdown formatting like *bold* or _italic_ text.
         """,
         
         "helpful_techie": f"""
@@ -613,6 +601,7 @@ def get_post_style_prompt(style, topic, content_type):
         Break it down in simple terms. Be encouraging and supportive of others in the {content_type} community.
         Keep it under 180 characters. Be helpful without being condescending.
         DO NOT start with greetings like "Hey friends" or "Hello everyone" - jump straight into the content.
+        DO NOT use any markdown formatting like *bold* or _italic_ text.
         """,
         
         "excited_gamer": f"""
@@ -620,6 +609,7 @@ def get_post_style_prompt(style, topic, content_type):
         Sound like you just found something awesome and can't wait to share it with your gaming friends.
         Keep it under 180 characters. Be energetic and positive.
         DO NOT start with greetings like "Hey friends" or "Hello everyone" - jump straight into the content.
+        DO NOT use any markdown formatting like *bold* or _italic_ text.
         """,
         
         "thoughtful_buddy": f"""
@@ -627,6 +617,7 @@ def get_post_style_prompt(style, topic, content_type):
         Be reflective but warm. Show you care about the {content_type} community and its direction.
         Keep it under 180 characters. Be insightful but approachable.
         DO NOT start with greetings like "Hey friends" or "Hello everyone" - jump straight into the content.
+        DO NOT use any markdown formatting like *bold* or _italic_ text.
         """,
         
         "creative_mind": f"""
@@ -634,6 +625,7 @@ def get_post_style_prompt(style, topic, content_type):
         Talk about possibilities and creative potential in the {content_type} space.
         Keep it under 180 characters. Be visionary but grounded.
         DO NOT start with greetings like "Hey friends" or "Hello everyone" - jump straight into the content.
+        DO NOT use any markdown formatting like *bold* or _italic_ text.
         """
     }
     
@@ -877,9 +869,6 @@ def generate_ai_content(prompt, content, content_type, main_topic, max_retries=2
                 if "candidates" in data and data["candidates"]:
                     post_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                     post_text = post_text.replace('```', '').strip()
-                    
-                    # Remove any Markdown formatting
-                    post_text = remove_markdown_formatting(post_text)
                     
                     # Add AI-generated hashtags for all post types
                     hashtags = generate_hashtags(main_topic, content_type)
