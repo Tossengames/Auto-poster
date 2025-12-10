@@ -6,7 +6,7 @@ on:
     # Converts to:
     # 2:00 PM UTC = 9:00 AM EST / 6:00 AM PST (Morning engagement)
     # 9:00 PM UTC = 4:00 PM EST / 1:00 PM PST (Afternoon engagement)
-    - cron: '0 15,23 * * *'
+   # - cron: '0 15,23 * * *'
   workflow_dispatch: # Allows manual triggering
 
 jobs:
