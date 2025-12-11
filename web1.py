@@ -1,211 +1,137 @@
-import os
-import requests
-import random
-import time
-import json
 import feedparser
-from datetime import datetime
-import tweepy
+import openai
+import random
 import re
+from datetime import datetime
 
-# =====================================
-# CONFIG
-# =====================================
+openai.api_key = "YOUR_API_KEY"
 
-TWITTER_API_KEY = os.environ.get('TWITTER_API_KEY')
-TWITTER_API_SECRET = os.environ.get('TWITTER_API_SECRET')
-TWITTER_ACCESS_TOKEN = os.environ.get('TWITTER_ACCESS_TOKEN')
-TWITTER_ACCESS_TOKEN_SECRET = os.environ.get('TWITTER_ACCESS_TOKEN_SECRET')
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
-
-# --- WEB3 / CRYPTO FEEDS ONLY ---
-WEB3_RSS_FEEDS = [
+# --------------------------------------------
+# 1. RSS FEEDS (Web3 Only)
+# --------------------------------------------
+WEB3_FEEDS = [
     "https://decrypt.co/feed",
     "https://cointelegraph.com/rss",
     "https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml",
-    "https://blockworks.co/feed",
-    "https://cryptobriefing.com/feed/",
     "https://thedefiant.io/feed",
-    "https://www.securityweek.com/feed/",
-    "https://krebsonsecurity.com/feed/",
-    "https://portswigger.net/daily-swig/feed"
+    "https://blockworks.co/feed",
 ]
 
-# Avoid low-quality promo/pump/airdrop spam
-WEB3_PROMO_FILTER = [
-    "airdrop", "giveaway", "free tokens", "pump", "low cap", 
-    "moonshot", "signal group", "presale", "whitelist", 
-    "casino", "betting", "bonus", "deposit", "gambling",
-    "sponsored", "partnership", "launchpad", "meme coin"
+# --------------------------------------------
+# 2. Filtering: Skip useless promotional junk
+# --------------------------------------------
+SKIP_KEYWORDS = [
+    "airdrop", "giveaway", "casino", "gambling",
+    "sponsored", "token sale", "pre-sale", "ICO",
+    "bonus", "affiliate"
 ]
 
-QUALITY_KEYWORDS = [
-    "blockchain", "ethereum", "bitcoin", "crypto",
-    "layer 2", "security", "hack", "exploit", "breach",
-    "zk", "rollup", "protocol", "governance",
-    "wallet", "defi", "bridge", "sec", "regulation",
-]
+# --------------------------------------------
+# 3. Hashtag Generator
+# Creates hashtags based on topic
+# --------------------------------------------
+def generate_hashtags(text):
+    base_tags = ["#Web3", "#Crypto", "#Blockchain"]
 
-# =====================================
-# HELPERS
-# =====================================
+    topic_tags_map = {
+        "Bitcoin": ["#BTC", "#Bitcoin"],
+        "Ethereum": ["#ETH", "#Ethereum"],
+        "DeFi": ["#DeFi", "#YieldFarming", "#DEX"],
+        "NFT": ["#NFT", "#NFTCommunity", "#NFTs"],
+        "security": ["#Web3Security", "#CryptoSecurity"],
+        "hack": ["#Exploit", "#SecurityAlert"],
+        "smart contract": ["#SmartContracts", "#Solidity"],
+        "AI": ["#AI", "#AICrypto"],
+    }
 
-def is_promo(article):
-    text = (article.get("title","") + " " + article.get("summary","")).lower()
-    return any(k in text for k in WEB3_PROMO_FILTER)
+    final_tags = base_tags.copy()
 
-def is_quality(article):
-    title = article.get("title","").lower()
-    return any(k in title for k in QUALITY_KEYWORDS)
+    for keyword, tags in topic_tags_map.items():
+        if keyword.lower() in text.lower():
+            final_tags.extend(tags)
 
-def extract_image(entry):
-    try:
-        if hasattr(entry, "media_content"):
-            for m in entry.media_content:
-                if "url" in m:
-                    return m["url"]
-        if hasattr(entry, "links"):
-            for link in entry.links:
-                if hasattr(link, "type") and "image" in link.type:
-                    return link.href
-        # regex
-        if hasattr(entry, "summary"):
-            imgs = re.findall(r'<img[^>]+src="([^">]+)"', entry.summary)
-            if imgs:
-                return imgs[0]
-        return None
-    except:
-        return None
+    final_tags = list(set(final_tags))
+    return " ".join(final_tags[:6])
 
-def fetch_web3_news():
-    print("📡 Fetching Web3 RSS...")
-    articles = []
-
-    for feed_url in WEB3_RSS_FEEDS:
-        try:
-            feed = feedparser.parse(feed_url)
-            for entry in feed.entries[:6]:
-                date = None
-                if hasattr(entry, "published_parsed"):
-                    date = datetime(*entry.published_parsed[:6])
-                if date and (datetime.now() - date).days > 2:
-                    continue
-
-                articles.append({
-                    "title": entry.title,
-                    "summary": entry.summary if hasattr(entry, "summary") else "",
-                    "link": entry.link,
-                    "source": feed.feed.title if hasattr(feed.feed, "title") else "Unknown",
-                    "image_url": extract_image(entry)
-                })
-        except:
-            continue
-
-    # Filter
-    filtered = [
-        a for a in articles 
-        if not is_promo(a) and is_quality(a)
-    ]
-
-    print(f"✅ {len(filtered)} quality web3 articles found.")
-    random.shuffle(filtered)
-    return filtered
-
-# =====================================
-# AI GENERATION
-# =====================================
-
-def ai_generate(prompt: str):
-    try:
-        r = requests.post(
-            "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent",
-            params={"key": GEMINI_API_KEY},
-            headers={"Content-Type": "application/json"},
-            json={"contents":[{"parts":[{"text": prompt}]}]},
-            timeout=40
-        )
-        data = r.json()
-        return data["candidates"][0]["content"]["parts"][0]["text"].strip()
-    except:
-        return "Web3 keeps evolving fast — big shifts happening across the ecosystem."
-
-def generate_web3_post(article):
-    title = article["title"]
-
+# --------------------------------------------
+# 4. AI Content Generator
+# Creates valuable Web3 posts (not shallow)
+# --------------------------------------------
+def create_web3_post(title, summary, link):
     prompt = f"""
-Write a short, smart Twitter post about this Web3 topic:
+You are an expert Web3 researcher.
+
+Write a **high-value Twitter/X post** about this article:
 
 Title: {title}
+Summary: {summary}
 
-Style:
-- Smart, clean Web3 + crypto insight
-- Human tone, not hype
-- 1–2 emojis max
-- Max 150 characters
-- No hashtags
-- No promotions
-- Add a small insight or question
+Your output MUST follow this structure:
 
-Return ONLY the tweet text.
+1. **A strong hook**
+2. **A useful explanation**
+3. **A valuable insight or warning**
+4. **A practical takeaway**
+5. **Smart hashtags** (based on topic)
+
+Keep it short, punchy, and valuable.
+Do NOT repeat the title.
+Do NOT mention the article or say “according to”.
+Do NOT include any links.
 """
 
-    text = ai_generate(prompt)
-    return text[:150]
+    response = openai.ChatCompletion.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}]
+    )
 
-# =====================================
-# TWITTER POST
-# =====================================
+    post = response["choices"][0]["message"]["content"]
+    hashtags = generate_hashtags(title + " " + summary)
 
-def twitter_post(text, img_url=None):
-    try:
-        # Upload media v1.1
-        media_ids = []
-        if img_url:
-            try:
-                auth = tweepy.OAuthHandler(TWITTER_API_KEY, TWITTER_API_SECRET)
-                auth.set_access_token(TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET)
-                api = tweepy.API(auth)
+    return post + "\n\n" + hashtags
 
-                img_data = requests.get(img_url, timeout=10).content
-                temp = "/tmp/web3.jpg"
-                with open(temp, "wb") as f:
-                    f.write(img_data)
+# --------------------------------------------
+# 5. Fetch & Filter Articles
+# --------------------------------------------
+def fetch_articles():
+    items = []
 
-                media = api.media_upload(temp)
-                media_ids.append(media.media_id_string)
-            except:
-                pass
+    for feed in WEB3_FEEDS:
+        parsed = feedparser.parse(feed)
 
-        # Create tweet v2
-        client = tweepy.Client(
-            consumer_key=TWITTER_API_KEY,
-            consumer_secret=TWITTER_API_SECRET,
-            access_token=TWITTER_ACCESS_TOKEN,
-            access_token_secret=TWITTER_ACCESS_TOKEN_SECRET
-        )
+        for entry in parsed.entries:
+            text = (entry.title + " " + entry.get("summary", "")).lower()
 
-        if media_ids:
-            client.create_tweet(text=text, media_ids=media_ids)
-        else:
-            client.create_tweet(text=text)
+            if any(bad in text for bad in SKIP_KEYWORDS):
+                continue
 
-        print("✅ Tweet posted")
-    except Exception as e:
-        print(f"❌ Twitter error: {e}")
+            items.append({
+                "title": entry.title,
+                "summary": entry.get("summary", ""),
+                "link": entry.link
+            })
 
-# =====================================
-# MAIN
-# =====================================
+    return items
 
-def run_web3_bot():
-    articles = fetch_web3_news()
+# --------------------------------------------
+# 6. MAIN – Generate a Post
+# --------------------------------------------
+def generate_web3_content():
+    articles = fetch_articles()
+
     if not articles:
-        print("❌ No content")
-        return
+        return "No suitable Web3 content found."
 
-    article = articles[0]
-    post = generate_web3_post(article)
-    twitter_post(post, article.get("image_url"))
+    chosen = random.choice(articles)
 
+    return create_web3_post(
+        title=chosen["title"],
+        summary=chosen["summary"],
+        link=chosen["link"]
+    )
+
+# --------------------------------------------
+# 7. Run the Script Once
+# --------------------------------------------
 if __name__ == "__main__":
-    run_web3_bot()
+    print(generate_web3_content())
