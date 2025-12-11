@@ -43,24 +43,26 @@ def should_filter_article(article):
     """Check if article should be filtered out"""
     combined_text = f"{article.get('title', '')} {article.get('summary', '')}".lower()
     
-    # Filter out promotional content[citation:1]
+    # Filter out promotional content
     if any(term in combined_text for term in PROMOTIONAL_TERMS):
         return True
     
-    # Filter out old articles (older than 7 days)
+    # Filter out old articles (older than 14 days)
     pub_date = article.get('published')
-    if pub_date and (datetime.now() - pub_date).days > 7:
-        return True
+    if pub_date:
+        age_days = (datetime.now() - pub_date).days
+        if age_days > 14:
+            return True
     
     return False
 
 def filter_articles(articles):
-    """Filter articles using list comprehension[citation:2][citation:5][citation:8]"""
-    # This is simpler and more Pythonic than using map/filter[citation:2]
-    return [
-        article for article in articles
-        if not should_filter_article(article)
-    ]
+    """Filter articles using list comprehension"""
+    filtered = []
+    for article in articles:
+        if not should_filter_article(article):
+            filtered.append(article)
+    return filtered
 
 # ================================
 # CONTENT FETCHING
@@ -72,17 +74,21 @@ def fetch_articles():
     for feed_url in AI_RSS_FEEDS:
         try:
             feed = feedparser.parse(feed_url)
+            
             if not feed.entries:
                 continue
                 
             for entry in feed.entries[:5]:  # Limit entries per feed
                 pub_date = None
                 if hasattr(entry, 'published_parsed') and entry.published_parsed:
-                    pub_date = datetime(*entry.published_parsed[:6])
+                    try:
+                        pub_date = datetime(*entry.published_parsed[:6])
+                    except:
+                        pass
                 
                 article = {
-                    'title': entry.title,
-                    'link': entry.link,
+                    'title': entry.title if hasattr(entry, 'title') else 'No title',
+                    'link': entry.link if hasattr(entry, 'link') else '#',
                     'summary': entry.summary if hasattr(entry, 'summary') else '',
                     'published': pub_date,
                     'source': feed.feed.title if hasattr(feed.feed, 'title') else 'Unknown',
@@ -93,13 +99,9 @@ def fetch_articles():
             time.sleep(0.5)  # Be polite to servers
             
         except Exception as e:
-            print(f"⚠️ Error fetching {feed_url}: {e}")
             continue
     
-    # Apply filtering[citation:7]
-    filtered = filter_articles(all_articles)
-    print(f"📰 Found {len(filtered)} articles after filtering")
-    return filtered
+    return all_articles
 
 def extract_image(entry):
     """Extract image URL from feed entry"""
@@ -117,7 +119,11 @@ def extract_image(entry):
         # Try to extract from content
         content = ""
         if hasattr(entry, 'content'):
-            content = ' '.join([c.value for c in entry.content])
+            if isinstance(entry.content, list):
+                content = ' '.join([c.value for c in entry.content if hasattr(c, 'value')])
+            elif hasattr(entry.content, 'value'):
+                content = entry.content.value
+                
         elif hasattr(entry, 'summary'):
             content = entry.summary
             
@@ -134,67 +140,111 @@ def extract_image(entry):
 # ================================
 def generate_tweet_content(article):
     """Generate tweet content using Gemini API"""
+    print(f"\n[DEBUG] Generating tweet for: {article['title'][:60]}...")
+    
     try:
-        prompt = f"""
-        Create an engaging tweet about this AI/ML topic: "{article['title']}"
+        # Clean and prepare the summary
+        summary = article['summary']
+        if len(summary) > 300:
+            summary = summary[:300] + "..."
         
-        Key points from article: {article['summary'][:200]}...
+        # Clean HTML tags from summary
+        summary = re.sub(r'<[^>]+>', '', summary)
+        
+        prompt = f"""
+        Create a tweet about this AI topic: "{article['title']}"
+        
+        Key points: {summary}
         
         Requirements:
-        - Write in a professional but engaging tone
+        - Write in a professional tone
         - Include key insight or takeaway
         - End with 3-4 relevant hashtags (like #AI, #MachineLearning, etc.)
         - Maximum 280 characters total
-        - DO NOT include URLs, links, or mentions
-        - Focus on the technical/content value
-        
-        Format: [Tweet content] [hashtags]
+        - DO NOT include URLs or links
+        - Focus on the technical/value aspect
         """
         
+        print(f"[DEBUG] Calling Gemini API...")
+        
+        # Try Gemini 1.5 Flash instead - more reliable endpoint
         response = requests.post(
-            "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent",
+            "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent",
             params={"key": GEMINI_API_KEY},
             headers={"Content-Type": "application/json"},
-            json={"contents": [{"parts": [{"text": prompt}]}]},
+            json={
+                "contents": [{
+                    "parts": [{"text": prompt}]
+                }]
+            },
             timeout=30
         )
         
+        print(f"[DEBUG] Gemini API response status: {response.status_code}")
+        
         if response.status_code == 200:
             data = response.json()
-            if data.get("candidates"):
+            print(f"[DEBUG] Response received successfully")
+            
+            if data.get("candidates") and len(data["candidates"]) > 0:
                 text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                return text[:280]  # Ensure length limit
+                print(f"[DEBUG] Generated text: {text[:100]}...")
+                return text[:280]
+            else:
+                print(f"[DEBUG] No candidates in response")
+                print(f"[DEBUG] Full response: {data}")
+                return None
+        elif response.status_code == 400:
+            print(f"[DEBUG] Bad request - likely invalid API key or quota")
+            print(f"[DEBUG] Response: {response.text[:200]}")
+            return None
+        elif response.status_code == 429:
+            print(f"[DEBUG] Rate limited - quota exceeded")
+            return None
+        else:
+            print(f"[DEBUG] Gemini API error: {response.status_code}")
+            return None
         
+    except requests.exceptions.Timeout:
+        print(f"[DEBUG] Gemini API timeout")
+        return None
+    except requests.exceptions.ConnectionError:
+        print(f"[DEBUG] Gemini API connection error")
+        return None
     except Exception as e:
-        print(f"⚠️ Gemini API error: {e}")
-    
-    return None
+        print(f"[DEBUG] Gemini API error: {type(e).__name__}: {str(e)[:100]}")
+        return None
 
 # ================================
 # TWITTER POSTING
 # ================================
 def post_to_twitter(content):
-    """Post content to Twitter using Tweepy[citation:9]"""
+    """Post content to Twitter using Tweepy"""
     try:
+        print(f"\n[DEBUG] Posting to Twitter...")
+        
         # Authenticate
         auth = tweepy.OAuthHandler(TWITTER_API_KEY, TWITTER_API_SECRET)
         auth.set_access_token(TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET)
-        api = tweepy.API(auth)
         
-        # Verify credentials[citation:9]
-        api.verify_credentials()
-        print("✅ Twitter authentication successful")
+        # Use API v1.1 for compatibility
+        api = tweepy.API(auth, wait_on_rate_limit=True)
+        
+        # Verify credentials
+        user = api.verify_credentials()
+        print(f"[DEBUG] Twitter auth successful: @{user.screen_name}")
         
         # Post tweet
-        api.update_status(content)
-        print(f"✅ Tweet posted: {content[:50]}...")
+        tweet = api.update_status(content)
+        print(f"[DEBUG] Tweet posted: ID {tweet.id}")
+        
         return True
         
     except tweepy.TweepyException as e:
-        print(f"❌ Twitter error: {e}")
+        print(f"[DEBUG] Twitter API error: {e}")
         return False
     except Exception as e:
-        print(f"❌ Posting error: {e}")
+        print(f"[DEBUG] Posting error: {type(e).__name__}: {str(e)[:100]}")
         return False
 
 # ================================
@@ -202,7 +252,7 @@ def post_to_twitter(content):
 # ================================
 def main():
     print("🤖 AI Content Bot Starting...")
-    print("=" * 40)
+    print("=" * 50)
     
     # Validate credentials
     required_vars = [
@@ -211,39 +261,64 @@ def main():
         GEMINI_API_KEY
     ]
     
-    if not all(required_vars):
-        print("❌ Missing environment variables")
+    missing_vars = []
+    var_names = ['TWITTER_API_KEY', 'TWITTER_API_SECRET', 'TWITTER_ACCESS_TOKEN', 'TWITTER_ACCESS_TOKEN_SECRET', 'GEMINI_API_KEY']
+    
+    for name, value in zip(var_names, required_vars):
+        if not value:
+            missing_vars.append(name)
+    
+    if missing_vars:
+        print(f"❌ Missing: {', '.join(missing_vars)}")
         return
+    
+    print("✅ All environment variables are set")
     
     # Fetch and filter articles
+    print("\n📡 Fetching articles...")
     articles = fetch_articles()
     
-    # Skip if no articles found[citation:4]
     if not articles:
-        print("⏭️ No articles found after filtering. Skipping post.")
+        print("⏭️ No articles found. Skipping post.")
         return
     
+    print(f"📊 Found {len(articles)} articles")
+    
+    filtered_articles = filter_articles(articles)
+    
+    if not filtered_articles:
+        print("⏭️ No articles passed filtering. Skipping post.")
+        return
+    
+    print(f"✅ {len(filtered_articles)} articles after filtering")
+    
     # Select random article
-    selected_article = random.choice(articles)
-    print(f"📖 Selected article: {selected_article['title'][:60]}...")
+    selected_article = random.choice(filtered_articles)
+    print(f"\n🎯 Selected: {selected_article['title'][:80]}...")
     
     # Generate tweet content
     tweet_content = generate_tweet_content(selected_article)
     
     if not tweet_content:
-        print("❌ Failed to generate tweet content")
+        print("\n❌ Failed to generate tweet content. Skipping post.")
+        print("   This is usually due to:")
+        print("   1. Invalid Gemini API key in GitHub Secrets")
+        print("   2. API quota exceeded")
+        print("   3. Network issue in GitHub Actions")
         return
     
-    print(f"📝 Generated tweet ({len(tweet_content)} chars):")
-    print(f"---\n{tweet_content}\n---")
+    print(f"\n📝 Generated tweet ({len(tweet_content)} chars):")
+    print("-" * 50)
+    print(tweet_content)
+    print("-" * 50)
     
     # Post to Twitter
     success = post_to_twitter(tweet_content)
     
     if success:
-        print("🎉 Bot execution completed successfully!")
+        print("\n🎉 Success!")
     else:
-        print("❌ Bot execution failed")
+        print("\n❌ Failed to post")
 
 # ================================
 # ENTRY POINT
