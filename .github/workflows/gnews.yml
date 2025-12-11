@@ -3,7 +3,7 @@ name: Gaming News Bot
 on:
   # Run daily at 10:00 UTC (adjust as needed)
   schedule:
-    - cron: '0 10 * * *'
+    #- cron: '0 10 * * *'
   # Allow manual trigger
   workflow_dispatch:
 
