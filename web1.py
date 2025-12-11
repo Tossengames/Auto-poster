@@ -75,12 +75,12 @@ POST_STYLES = [
 WEB3_SECURITY_HASHTAGS = {
     "general": ["#Web3Security", "#BlockchainSecurity", "#CryptoSecurity", "#DeFiSecurity"],
     "smart_contract": ["#SmartContracts", "#Solidity", "#Audit", "#Vulnerability"],
-    "incident": ["#IncidentResponse", #Rekt", "#Exploit", "#SecurityAlert"],
-    "tools": ["#SecurityTools", #Auditing", #StaticAnalysis", "#Fuzzing"],
-    "privacy": ["#ZeroKnowledge", #ZKP", #Privacy", #Cryptography"],
-    "research": ["#SecurityResearch", #BugBounty", #WhiteHat", #Hack"],
-    "layer": ["#Layer2Security", #ZKProofs", #Rollups", #L2"],
-    "trending": ["#Crypto", #Blockchain", #Ethereum", #Bitcoin"]
+    "incident": ["#IncidentResponse", "#Rekt", "#Exploit", "#SecurityAlert"],
+    "tools": ["#SecurityTools", "#Auditing", "#StaticAnalysis", "#Fuzzing"],
+    "privacy": ["#ZeroKnowledge", "#ZKP", "#Privacy", "#Cryptography"],
+    "research": ["#SecurityResearch", "#BugBounty", "#WhiteHat", "#Hack"],
+    "layer": ["#Layer2Security", "#ZKProofs", "#Rollups", "#L2"],
+    "trending": ["#Crypto", "#Blockchain", "#Ethereum", "#Bitcoin"]
 }
 
 # ================================
