@@ -19,11 +19,22 @@ TWITTER_ACCESS_TOKEN_SECRET = os.environ.get('TWITTER_ACCESS_TOKEN_SECRET')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 
 # ================================
-# WEB3 SECURITY RSS FEEDS (20+ Sources)
+# RSS FEEDS - Web3, Tech, and General Web
 # ================================
 
 RSS_FEEDS = [
-    # Core Security Research & Blogs
+    # Web3 & Blockchain
+    'https://blog.ethereum.org/feed.xml',
+    'https://solana.com/news/rss',
+    'https://consensys.io/blog/feed/',
+    'https://www.paradigm.xyz/feed.xml',
+    'https://a16zcrypto.com/feed/',
+    'https://www.coindesk.com/arc/outboundfeeds/rss/',
+    'https://cointelegraph.com/rss',
+    'https://decrypt.co/feed',
+    'https://thedefiant.io/feed',
+    
+    # Web3 Security
     'https://blog.trailofbits.com/feed/',
     'https://medium.com/feed/immunefi',
     'https://rekt.news/feed/',
@@ -33,25 +44,28 @@ RSS_FEEDS = [
     'https://quantstamp.com/blog/feed/',
     'https://blog.openzeppelin.com/feed/',
     
-    # Major Crypto/Web3 Media
-    'https://consensys.io/blog/feed/',
-    'https://www.coindesk.com/arc/outboundfeeds/rss/',
-    'https://cointelegraph.com/rss',
-    'https://decrypt.co/feed',
-    'https://thedefiant.io/feed',
+    # General Tech & Web
+    'https://techcrunch.com/feed/',
+    'https://www.wired.com/feed/rss',
+    'https://arstechnica.com/feed/',
+    'https://www.theverge.com/rss/index.xml',
+    'https://news.ycombinator.com/rss',
+    'https://stackoverflow.blog/feed/',
+    'https://github.blog/feed/',
     
-    # Audit Firms & Security Companies
+    # AI & Developer Tools
+    'https://openai.com/blog/rss/',
+    'https://ai.googleblog.com/feed.xml',
+    'https://www.anthropic.com/index.xml',
+    'https://blog.cloudflare.com/rss/',
+    'https://netflixtechblog.com/feed',
+    
+    # Protocol & Ecosystem Blogs
     'https://www.certik.com/resources/blog/rss',
     'https://www.peckshield.com/blog?format=rss',
     'https://blog.solidityscan.com/rss/',
     'https://mixbytes.io/blog/feed/',
-    'https://blog.cyfrin.io/rss/',
-    
-    # Protocol & Ecosystem Blogs
-    'https://blog.ethereum.org/feed.xml',
-    'https://solana.com/news/rss',
-    'https://www.paradigm.xyz/feed.xml',
-    'https://a16zcrypto.com/feed/'
+    'https://blog.cyfrin.io/rss/'
 ]
 
 # ================================
@@ -60,7 +74,7 @@ RSS_FEEDS = [
 
 def is_spam_or_irrelevant(article):
     """
-    Filter out spam, promotions, and non-Web3 content.
+    Filter out spam, promotions, and completely irrelevant content.
     Returns True if article should be filtered out.
     """
     title = article.get('title', '').lower()
@@ -70,30 +84,13 @@ def is_spam_or_irrelevant(article):
         'buy now', 'limited time offer', 'discount code', 'coupon code',
         'airdrop live', 'whitelist open', 'presale starting', 'ico launch',
         'investment opportunity', 'earn passive', 'double your',
-        '100x potential', 'get rich quick', 'sign up bonus'
+        '100x potential', 'get rich quick', 'sign up bonus',
+        'gambling', 'casino', 'betting', 'adult content'
     ]
     
     for phrase in spam_phrases:
         if phrase in title:
             return True
-    
-    # Soft filters - might be irrelevant to Web3 security
-    irrelevant_indicators = [
-        'price prediction', 'market analysis', 'trading tips',
-        'exchange listing', 'partnership announcement', 'mainnet launch',
-        'tokenomics explained', 'roadmap update', 'ama announcement'
-    ]
-    
-    # Check if title contains Web3 security relevance
-    # If it doesn't have security terms AND has irrelevant terms, filter
-    has_security_terms = any(term in title for term in 
-        ['hack', 'exploit', 'vulnerability', 'security', 'audit', 
-         'breach', 'attack', 'risk', 'threat', 'flash loan', 'reentrancy'])
-    
-    has_irrelevant_terms = any(term in title for term in irrelevant_indicators)
-    
-    if has_irrelevant_terms and not has_security_terms:
-        return True
     
     return False
 
@@ -138,6 +135,13 @@ def fetch_articles():
                             image_url = media['url']
                             break
                 
+                # Try other image sources
+                if not image_url and hasattr(entry, 'links'):
+                    for link in entry.links:
+                        if hasattr(link, 'type') and link.type and 'image' in link.type:
+                            image_url = link.href
+                            break
+                
                 article = {
                     'title': entry.title,
                     'link': entry.link,
@@ -154,39 +158,118 @@ def fetch_articles():
         except Exception as e:
             continue  # Silently skip failed feeds
     
-    print(f"✅ Found {len(all_articles)} recent, relevant articles")
+    print(f"✅ Found {len(all_articles)} recent articles")
     return all_articles
 
-def generate_structured_post(article):
+def categorize_article(article):
     """
-    Generate a post with: What Happened, Why It Matters, What To Do
+    Determine the category of the article for appropriate content generation
+    """
+    title = article['title'].lower()
+    summary = article.get('summary', '').lower()
+    content = title + " " + summary
+    
+    # Define category keywords
+    categories = {
+        'web3_security': [
+            'hack', 'exploit', 'vulnerability', 'breach', 'drain', 'stolen',
+            'attack', 'reentrancy', 'flash loan', 'audit finding', 'critical bug',
+            'rug pull', 'phishing', 'security flaw', 'risk', 'threat', 'mitigation'
+        ],
+        'web3_general': [
+            'web3', 'blockchain', 'crypto', 'defi', 'nft', 'dao', 'dapp',
+            'ethereum', 'bitcoin', 'solana', 'token', 'protocol', 'layer 2',
+            'zk', 'zero knowledge', 'rollup', 'validator', 'staking'
+        ],
+        'tech_ai': [
+            'ai', 'artificial intelligence', 'machine learning', 'llm',
+            'gpt', 'anthropic', 'openai', 'deep learning', 'neural network',
+            'model', 'training', 'inference', 'prompt engineering'
+        ],
+        'tech_development': [
+            'code', 'programming', 'software', 'developer', 'github', 'git',
+            'api', 'framework', 'library', 'tool', 'vs code', 'jetbrains',
+            'docker', 'kubernetes', 'cloud', 'aws', 'azure', 'gcp'
+        ],
+        'tech_news': [
+            'tech', 'technology', 'startup', 'funding', 'raise', 'series',
+            'acquisition', 'merge', 'ipo', 'market', 'industry', 'trend'
+        ]
+    }
+    
+    # Score each category
+    category_scores = {}
+    for category, keywords in categories.items():
+        score = sum(1 for keyword in keywords if keyword in content)
+        category_scores[category] = score
+    
+    # Return the highest scoring category
+    best_category = max(category_scores, key=category_scores.get)
+    return best_category if category_scores[best_category] > 0 else 'tech_news'
+
+def generate_content_prompt(article, category):
+    """
+    Generate appropriate prompt based on article category
     """
     title = article['title']
-    summary = article['summary'][:500]  # Limit summary length
+    summary = article['summary'][:500]
     
-    prompt = f"""
-    Create a Twitter post about this Web3 security incident/development:
-    
-    TITLE: {title}
+    base_prompt = f"""
+    Create a Twitter post about this topic: {title}
     
     CONTEXT: {summary}
     
     FORMAT THE POST AS FOLLOWS:
     
-    1. WHAT HAPPENED: Briefly explain the security incident or development.
+    1. WHAT'S HAPPENING: Briefly explain the key development or news.
     2. WHY IT MATTERS: Explain the significance, impact, or broader implications.
-    3. WHAT TO DO: Provide 1-2 actionable security recommendations or takeaways.
+    3. KEY TAKEAWAY: Provide 1-2 insights, implications, or things to watch.
     
     GUIDELINES:
-    - Write in a concise, professional tone (like a security analyst)
-    - Use plain language but include technical accuracy
-    - Total length: 220-250 characters (leaving room for hashtags)
+    - Write in a concise, professional tone
+    - Use plain language but maintain accuracy
+    - Total length: 200-240 characters (leaving room for hashtags)
     - DO NOT use phrases like "As an AI" or "According to analysis"
-    - Sound like a human security expert, not a robot
-    - Make it genuinely useful for developers/investors
+    - Sound like a knowledgeable expert, not a robot
+    - Make it genuinely useful and informative
     
     Return ONLY the post text (no hashtags, no explanations).
     """
+    
+    # Category-specific adjustments
+    if category == 'web3_security':
+        prompt_addition = """
+        Focus on the security aspects: the vulnerability, impact, and how to protect against similar issues.
+        """
+    elif category == 'web3_general':
+        prompt_addition = """
+        Focus on Web3/blockchain innovation, adoption, or technical developments.
+        """
+    elif category == 'tech_ai':
+        prompt_addition = """
+        Focus on AI developments, capabilities, limitations, or implications.
+        """
+    elif category == 'tech_development':
+        prompt_addition = """
+        Focus on practical implications for developers, tools, or workflows.
+        """
+    else:
+        prompt_addition = """
+        Focus on the broader tech industry implications and trends.
+        """
+    
+    return base_prompt + prompt_addition
+
+def generate_structured_post(article):
+    """
+    Generate a post based on article category
+    """
+    # Determine category first
+    category = categorize_article(article)
+    print(f"📊 Article category: {category.replace('_', ' ').title()}")
+    
+    # Generate appropriate prompt
+    prompt = generate_content_prompt(article, category)
     
     try:
         response = requests.post(
@@ -207,30 +290,34 @@ def generate_structured_post(article):
                 post_text = re.sub(r'\b(as an ai|according to|language model)\b', '', post_text, flags=re.IGNORECASE)
                 post_text = ' '.join(post_text.split())  # Normalize whitespace
                 
-                return post_text
+                return post_text, category
                 
     except Exception as e:
         print(f"⚠️ Content generation failed: {e}")
     
-    return None
+    return None, category
 
-def generate_relevant_hashtags(article_title, post_text):
-    """Generate context-relevant hashtags"""
+def generate_relevant_hashtags(post_text, category):
+    """Generate context-relevant hashtags based on category and content"""
+    
     prompt = f"""
-    Based on this Web3 security post, suggest 3-4 relevant hashtags:
+    Based on this {category.replace('_', ' ')} post, suggest 3-5 relevant hashtags:
     
     POST: {post_text}
     
+    CATEGORY: {category.replace('_', ' ')}
+    
     Requirements:
-    - Include 1-2 popular Web3 security hashtags
-    - Include 1-2 specific/niche hashtags related to the topic
+    - Include 2-3 popular hashtags in this category
+    - Include 1-2 specific/niche hashtags related to the exact topic
     - All hashtags must be directly relevant
     - Return ONLY the hashtags as: #First #Second #Third
     
     Examples:
-    - For smart contract exploit: #Web3Security #SmartContracts #DeFi
-    - For wallet security: #CryptoSecurity #WalletSafety #Web3
-    - For audit findings: #SecurityAudit #Blockchain #SmartContracts
+    - Web3 security: #Web3Security #Crypto #SmartContracts #DeFi
+    - General Web3: #Web3 #Blockchain #Crypto #Innovation
+    - AI news: #AI #ArtificialIntelligence #Tech #Innovation
+    - Tech development: #Programming #Developer #Tech #Tools
     """
     
     try:
@@ -251,36 +338,45 @@ def generate_relevant_hashtags(article_title, post_text):
                 # Validate hashtags
                 hashtag_list = [h for h in hashtags.split() if h.startswith('#') and len(h) > 1]
                 if len(hashtag_list) >= 2:
-                    return ' '.join(hashtag_list[:4])
+                    return ' '.join(hashtag_list[:5])
                     
     except Exception:
         pass
     
-    # Fallback to general security hashtags
-    return "#Web3Security #Blockchain #Crypto"
+    # Fallback hashtags by category
+    fallback_hashtags = {
+        'web3_security': '#Web3Security #Crypto #Blockchain',
+        'web3_general': '#Web3 #Blockchain #Crypto',
+        'tech_ai': '#AI #Technology #Innovation',
+        'tech_development': '#Tech #Development #Programming',
+        'tech_news': '#Technology #TechNews #Innovation'
+    }
+    
+    return fallback_hashtags.get(category, '#Tech #News #Update')
 
 # ================================
 # AI QUALITY CHECK
 # ================================
 
-def audit_post_quality(article, post_text):
+def audit_post_quality(article, post_text, category):
     """
     AI-powered quality check to ensure post is useful and authentic
     Returns (is_approved, feedback_message)
     """
     prompt = f"""
-    CRITICAL REVIEW: Evaluate this Twitter post about a Web3 security topic.
+    CRITICAL REVIEW: Evaluate this Twitter post.
     
+    CATEGORY: {category.replace('_', ' ')}
     ORIGINAL ARTICLE TITLE: {article['title']}
     
     GENERATED POST: {post_text}
     
     EVALUATE ON THESE CRITERIA:
-    1. USEFULNESS: Does it provide genuine value? (explains what happened, why it matters, what to do)
-    2. AUTHENTICITY: Does it sound like a human security expert wrote it? (not AI-generated)
-    3. RELEVANCE: Is it actually about Web3/blockchain security?
+    1. USEFULNESS: Does it provide genuine value? (explains what's happening, why it matters, key takeaways)
+    2. AUTHENTICITY: Does it sound like a human expert wrote it? (not AI-generated)
+    3. RELEVANCE: Is it relevant to the category/topic?
     4. CLARITY: Is it clear and understandable?
-    5. ACTIONABLE: Does it provide practical insights or recommendations?
+    5. ACTIONABLE/INSIGHTFUL: Does it provide practical insights or valuable information?
     
     SCORING:
     - APPROVED: Meets all criteria, post is valuable and authentic
@@ -389,10 +485,11 @@ def post_to_twitter(content, image_url=None):
 
 def main():
     print("=" * 60)
-    print("🔐 WEB3 SECURITY CONTENT GENERATOR")
+    print("🤖 TECH & WEB3 CONTENT GENERATOR")
     print("=" * 60)
-    print("✓ Structured format (What/Why/What To Do)")
-    print("✓ 20+ RSS feeds for diverse content")
+    print("✓ Categorizes content (Web3, Security, AI, Dev, Tech)")
+    print("✓ Structured format (What/Why/Key Takeaway)")
+    print("✓ 30+ RSS feeds for diverse content")
     print("✓ AI quality check for usefulness")
     print("=" * 60)
     
@@ -421,19 +518,19 @@ def main():
     
     # Step 3: Generate structured post
     print("\n🤖 Generating structured post...")
-    post_text = generate_structured_post(article)
+    post_text, category = generate_structured_post(article)
     
     if not post_text:
         print("❌ Failed to generate post content")
         return
     
     # Step 4: Generate hashtags
-    hashtags = generate_relevant_hashtags(article['title'], post_text)
+    hashtags = generate_relevant_hashtags(post_text, category)
     full_post = f"{post_text} {hashtags}"
     
     # Step 5: AI quality check
     print("\n🔍 Running AI quality audit...")
-    is_approved, feedback = audit_post_quality(article, post_text)
+    is_approved, feedback = audit_post_quality(article, post_text, category)
     
     if not is_approved:
         print(f"❌ POST REJECTED: {feedback}")
@@ -460,6 +557,7 @@ def main():
     print(full_post)
     print("=" * 60)
     print(f"Character count: {len(full_post)}")
+    print(f"Category: {category.replace('_', ' ').title()}")
     print(f"Hashtags: {len([h for h in full_post.split() if h.startswith('#')])}")
     
     # Step 8: Post to Twitter
