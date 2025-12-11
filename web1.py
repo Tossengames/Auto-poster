@@ -69,21 +69,6 @@ POST_STYLES = [
 ]
 
 # ================================
-# WEB3 SECURITY HASHTAGS DATABASE
-# ================================
-
-WEB3_SECURITY_HASHTAGS = {
-    "general": ["#Web3Security", "#BlockchainSecurity", "#CryptoSecurity", "#DeFiSecurity"],
-    "smart_contract": ["#SmartContracts", "#Solidity", "#Audit", "#Vulnerability"],
-    "incident": ["#IncidentResponse", "#Rekt", "#Exploit", "#SecurityAlert"],
-    "tools": ["#SecurityTools", "#Auditing", "#StaticAnalysis", "#Fuzzing"],
-    "privacy": ["#ZeroKnowledge", "#ZKP", "#Privacy", "#Cryptography"],
-    "research": ["#SecurityResearch", "#BugBounty", "#WhiteHat", "#Hack"],
-    "layer": ["#Layer2Security", "#ZKProofs", "#Rollups", "#L2"],
-    "trending": ["#Crypto", "#Blockchain", "#Ethereum", "#Bitcoin"]
-}
-
-# ================================
 # CONTENT FILTERING FUNCTIONS
 # ================================
 
@@ -319,42 +304,71 @@ def extract_image_from_entry(entry):
         print(f"⚠️ Error extracting image: {e}")
         return None
 
-def get_security_hashtags(topic):
-    """Get relevant security hashtags based on topic"""
-    # Extract key terms from topic
-    topic_lower = topic.lower()
+def generate_security_hashtags(topic, content_type):
+    """Generate relevant hashtags using AI for security content"""
+    prompt = f"""
+    Generate 4-5 highly relevant, popular hashtags for a Web3 security post about: {topic}
     
-    # Select hashtag categories based on topic
-    selected_hashtags = []
+    Content type: {content_type}
     
-    # Always include general security hashtags
-    selected_hashtags.extend(WEB3_SECURITY_HASHTAGS["general"])
+    Requirements:
+    1. Focus on Web3/blockchain security topics
+    2. Mix popular and niche security hashtags
+    3. Include technical hashtags relevant to the specific topic
+    4. Consider trending security discussions
+    5. Keep them short, effective, and professional
+    6. Return ONLY the hashtags as: #First #Second #Third #Fourth #Fifth
     
-    # Add specific hashtags based on topic content
-    if any(term in topic_lower for term in ['smart contract', 'solidity', 'audit']):
-        selected_hashtags.extend(WEB3_SECURITY_HASHTAGS["smart_contract"])
+    Examples for smart contract vulnerability: #SmartContracts #Audit #Web3Security #Vulnerability #DeFi
+    Examples for incident analysis: #Web3Security #IncidentResponse #Rekt #SecurityAlert #Blockchain
+    Examples for cryptography: #ZeroKnowledge #ZKP #Cryptography #Privacy #Web3Security
+    Examples for audit findings: #Audit #SmartContracts #Security #Findings #Web3
     
-    if any(term in topic_lower for term in ['exploit', 'hack', 'breach', 'incident']):
-        selected_hashtags.extend(WEB3_SECURITY_HASHTAGS["incident"])
+    Make them specific to genuine security content - no promotional or generic tags.
+    """
     
-    if any(term in topic_lower for term in ['zero knowledge', 'zk', 'privacy', 'cryptography']):
-        selected_hashtags.extend(WEB3_SECURITY_HASHTAGS["privacy"])
+    try:
+        response = requests.post(
+            "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent",
+            params={"key": GEMINI_API_KEY},
+            headers={"Content-Type": "application/json"},
+            json={"contents": [{"parts": [{"text": prompt}]}]},
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "candidates" in data and data["candidates"]:
+                hashtags = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                hashtags = hashtags.replace('```', '').strip()
+                
+                # Validate hashtags format
+                hashtag_list = hashtags.split()
+                valid_hashtags = [h for h in hashtag_list if h.startswith('#') and len(h) > 1]
+                
+                if len(valid_hashtags) >= 3:
+                    print(f"🏷️ AI-generated hashtags: {' '.join(valid_hashtags[:5])}")
+                    return ' '.join(valid_hashtags[:5])
     
-    if any(term in topic_lower for term in ['defi', 'decentralized', 'finance']):
-        selected_hashtags.extend(WEB3_SECURITY_HASHTAGS["general"][3:4])  # DeFiSecurity
+    except Exception as e:
+        print(f"❌ Hashtag generation error: {e}")
     
-    # Add trending blockchain hashtags
-    selected_hashtags.extend(WEB3_SECURITY_HASHTAGS["trending"][:2])
+    # Fallback: Basic security hashtags
+    fallback_hashtags = ["#Web3Security", "#BlockchainSecurity", "#CryptoSecurity"]
     
-    # Remove duplicates and limit to 4-5 hashtags
-    unique_hashtags = []
-    for tag in selected_hashtags:
-        if tag not in unique_hashtags and len(unique_hashtags) < 5:
-            unique_hashtags.append(tag)
+    # Add specific hashtags based on content type
+    if content_type == 'smart_contract':
+        fallback_hashtags.extend(["#SmartContracts", "#Audit"])
+    elif content_type == 'incident':
+        fallback_hashtags.extend(["#IncidentResponse", "#SecurityAlert"])
+    elif content_type == 'cryptography':
+        fallback_hashtags.extend(["#Cryptography", "#Privacy"])
+    else:
+        fallback_hashtags.extend(["#Security", "#Tech"])
     
-    return " ".join(unique_hashtags)
+    return ' '.join(fallback_hashtags[:5])
 
-def get_post_style_prompt(style, topic):
+def get_post_style_prompt(style, topic, content_type):
     """Get writing prompts for security content"""
     prompts = {
         "security_analyst": f"""
@@ -367,8 +381,8 @@ def get_post_style_prompt(style, topic):
         4. Best practices to mitigate
         
         Tone: Professional, analytical, valuable
-        Length: 200-250 characters
-        Include relevant security hashtags
+        Length: 200-240 characters (leave room for hashtags)
+        DO NOT include hashtags in the analysis
         """,
         
         "technical_researcher": f"""
@@ -381,8 +395,8 @@ def get_post_style_prompt(style, topic):
         - Research findings
         
         Tone: Technical but accessible, research-focused
-        Length: 200-250 characters
-        Include relevant security hashtags
+        Length: 200-240 characters (leave room for hashtags)
+        DO NOT include hashtags in the insights
         """,
         
         "incident_responder": f"""
@@ -395,8 +409,8 @@ def get_post_style_prompt(style, topic):
         - Prevention strategies
         
         Tone: Practical, experienced, actionable
-        Length: 200-250 characters
-        Include relevant security hashtags
+        Length: 200-240 characters (leave room for hashtags)
+        DO NOT include hashtags in the analysis
         """,
         
         "auditor_perspective": f"""
@@ -409,8 +423,8 @@ def get_post_style_prompt(style, topic):
         - Risk assessment
         
         Tone: Expert, thorough, educational
-        Length: 200-250 characters
-        Include relevant security hashtags
+        Length: 200-240 characters (leave room for hashtags)
+        DO NOT include hashtags in the perspective
         """,
         
         "cryptography_expert": f"""
@@ -423,8 +437,8 @@ def get_post_style_prompt(style, topic):
         - Latest advances
         
         Tone: Knowledgeable, precise, forward-looking
-        Length: 200-250 characters
-        Include relevant security hashtags
+        Length: 200-240 characters (leave room for hashtags)
+        DO NOT include hashtags in the explanation
         """,
         
         "defi_security": f"""
@@ -437,8 +451,8 @@ def get_post_style_prompt(style, topic):
         - Protocol safety
         
         Tone: Specialized, financial security focus
-        Length: 200-250 characters
-        Include relevant security hashtags
+        Length: 200-240 characters (leave room for hashtags)
+        DO NOT include hashtags in the discussion
         """
     }
     
@@ -460,7 +474,10 @@ def generate_security_insight(articles):
     style = random.choice(POST_STYLES)
     print(f"🎨 Using post style: {style}")
     
-    prompt = get_post_style_prompt(style, topic)
+    # Determine content type from topic
+    content_type = determine_content_type(topic)
+    
+    prompt = get_post_style_prompt(style, topic, content_type)
     
     try:
         response = requests.post(
@@ -477,17 +494,26 @@ def generate_security_insight(articles):
                 post_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                 post_text = post_text.replace('```', '').strip()
                 
-                # Ensure hashtags are included
-                if not any('#' in post_text for tag in post_text.split()):
-                    hashtags = get_security_hashtags(topic)
-                    post_text += f" {hashtags}"
+                # Remove any hashtags that might have been included
+                post_text = re.sub(r'#\w+', '', post_text).strip()
+                
+                # Generate AI-based hashtags
+                hashtags = generate_security_hashtags(topic, content_type)
+                post_text += f" {hashtags}"
                 
                 # Clean up
                 post_text = remove_ai_indicators(post_text)
                 
                 # Final length check
                 if len(post_text) > 280:
-                    post_text = post_text[:277] + "..."
+                    # Try to shorten the main content first
+                    if len(hashtags) < 100:
+                        main_content = post_text[:-len(hashtags)]
+                        if len(main_content) > 180:
+                            main_content = main_content[:177] + "..."
+                        post_text = main_content + hashtags
+                    else:
+                        post_text = post_text[:277] + "..."
                 
                 print(f"✅ Security insight created ({len(post_text)} chars)")
                 return post_text, image_url
@@ -514,6 +540,8 @@ def generate_vulnerability_analysis(articles):
     topic = article['title']
     image_url = article.get('image_url')
     
+    content_type = determine_content_type(topic)
+    
     prompt = f"""
     Analyze this Web3 security vulnerability: {topic}
     
@@ -524,11 +552,11 @@ def generate_vulnerability_analysis(articles):
     4. Similar vulnerabilities to watch for
     
     Format: Concise, technical but readable
-    Length: 220-260 characters
-    Include 3-4 relevant security hashtags
+    Length: 200-240 characters
+    DO NOT include hashtags in the analysis
     
     Example format:
-    "Reentrancy vulnerability in XYZ protocol allowed attackers to drain funds. Root cause: unsafe external calls before state updates. Mitigation: use checks-effects-interactions pattern. #SmartContracts #Audit #Web3Security"
+    "Reentrancy vulnerability in XYZ protocol allowed attackers to drain funds. Root cause: unsafe external calls before state updates. Mitigation: use checks-effects-interactions pattern."
     """
     
     try:
@@ -546,15 +574,23 @@ def generate_vulnerability_analysis(articles):
                 post_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                 post_text = post_text.replace('```', '').strip()
                 
-                # Ensure hashtags
-                if not any('#' in post_text for tag in post_text.split()):
-                    hashtags = get_security_hashtags(topic)
-                    post_text += f" {hashtags}"
+                # Remove any hashtags
+                post_text = re.sub(r'#\w+', '', post_text).strip()
+                
+                # Generate AI-based hashtags
+                hashtags = generate_security_hashtags(topic, content_type)
+                post_text += f" {hashtags}"
                 
                 post_text = remove_ai_indicators(post_text)
                 
                 if len(post_text) > 280:
-                    post_text = post_text[:277] + "..."
+                    if len(hashtags) < 100:
+                        main_content = post_text[:-len(hashtags)]
+                        if len(main_content) > 180:
+                            main_content = main_content[:177] + "..."
+                        post_text = main_content + hashtags
+                    else:
+                        post_text = post_text[:277] + "..."
                 
                 print(f"✅ Vulnerability analysis created ({len(post_text)} chars)")
                 return post_text, image_url
@@ -566,22 +602,77 @@ def generate_vulnerability_analysis(articles):
 
 def generate_security_tips():
     """Generate practical security tips"""
-    security_tips = [
-        "Smart contract security tip: Always use the latest compiler version with security patches enabled. Old compilers may have known vulnerabilities that attackers can exploit. #SmartContracts #Security #Web3",
-        "DeFi security: Implement time locks for critical governance changes. This gives users time to react to potentially malicious proposals. #DeFiSecurity #Governance #Blockchain",
-        "Wallet security: Use hardware wallets for significant funds. Never share seed phrases & consider multi-sig for team wallets. #WalletSecurity #Crypto #Web3Security",
-        "Audit importance: Multiple audit rounds with different firms catch different issues. Don't rely on a single audit before mainnet launch. #Audit #SmartContracts #Security",
-        "Incident response: Have a pre-planned response strategy for security incidents. This includes communication plans, mitigation steps, and post-mortem processes. #IncidentResponse #Web3Security",
-        "Access control: Implement proper role-based access control in smart contracts. Use modifiers to restrict critical functions to authorized addresses only. #SmartContracts #AccessControl #Security",
-        "Oracle security: Use multiple oracle sources with price aggregation. Single oracle failures can lead to significant protocol losses. #Oracle #DeFiSecurity #Web3",
-        "Code review: Peer review is essential. Four eyes see more than two - especially for security-critical code. #CodeReview #Security #Development",
-        "Upgrade patterns: Use proxy patterns for upgradeable contracts but ensure proper access controls on upgrade functions. #Upgradeability #SmartContracts #Security",
-        "Testing: Comprehensive test coverage including edge cases and fuzz testing. 95%+ test coverage should be standard for DeFi protocols. #Testing #Fuzzing #Security"
+    security_tips_prompts = [
+        "Generate a smart contract security tip for developers. Focus on practical, actionable advice. Length: 180-220 characters. DO NOT include hashtags.",
+        "Create a DeFi security tip about protocol safety. Make it specific to decentralized finance risks. Length: 180-220 characters. DO NOT include hashtags.",
+        "Provide a wallet security tip for crypto users. Focus on practical protection measures. Length: 180-220 characters. DO NOT include hashtags.",
+        "Share an audit process tip for security teams. Focus on improving audit effectiveness. Length: 180-220 characters. DO NOT include hashtags.",
+        "Offer an incident response tip for security incidents. Focus on preparation and execution. Length: 180-220 characters. DO NOT include hashtags.",
+        "Give an access control security tip for smart contract developers. Focus on authorization patterns. Length: 180-220 characters. DO NOT include hashtags.",
+        "Provide an oracle security tip for DeFi protocols. Focus on data integrity and reliability. Length: 180-220 characters. DO NOT include hashtags.",
+        "Share a code review tip for security-critical code. Focus on process and effectiveness. Length: 180-220 characters. DO NOT include hashtags.",
+        "Offer an upgrade pattern tip for smart contracts. Focus on security during upgrades. Length: 180-220 characters. DO NOT include hashtags.",
+        "Give a testing strategy tip for Web3 security. Focus on comprehensive security testing. Length: 180-220 characters. DO NOT include hashtags."
     ]
     
-    post_text = random.choice(security_tips)
+    prompt = random.choice(security_tips_prompts)
+    content_type = "security_tips"
     
-    # Ensure proper length
+    try:
+        response = requests.post(
+            "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent",
+            params={"key": GEMINI_API_KEY},
+            headers={"Content-Type": "application/json"},
+            json={"contents": [{"parts": [{"text": prompt}]}]},
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "candidates" in data and data["candidates"]:
+                post_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                post_text = post_text.replace('```', '').strip()
+                
+                # Remove any hashtags
+                post_text = re.sub(r'#\w+', '', post_text).strip()
+                
+                # Generate AI-based hashtags
+                hashtags = generate_security_hashtags("security tips", content_type)
+                post_text += f" {hashtags}"
+                
+                # Ensure proper length
+                if len(post_text) > 280:
+                    if len(hashtags) < 100:
+                        main_content = post_text[:-len(hashtags)]
+                        if len(main_content) > 180:
+                            main_content = main_content[:177] + "..."
+                        post_text = main_content + hashtags
+                    else:
+                        post_text = post_text[:277] + "..."
+                
+                return post_text, None
+    
+    except Exception as e:
+        print(f"❌ Security tip generation error: {e}")
+    
+    # Fallback
+    fallback_tips = [
+        "Smart contract security tip: Always use the latest compiler version with security patches enabled.",
+        "DeFi security: Implement time locks for critical governance changes to allow user response time.",
+        "Wallet security: Use hardware wallets for significant funds and never share seed phrases.",
+        "Audit importance: Multiple audit rounds with different firms catch different security issues.",
+        "Incident response: Have a pre-planned strategy including communication and mitigation steps.",
+        "Access control: Implement proper role-based access control with modifiers in smart contracts.",
+        "Oracle security: Use multiple oracle sources with aggregation to reduce single-point failures.",
+        "Code review: Peer review is essential for security-critical code - four eyes see more than two.",
+        "Upgrade patterns: Use proxy patterns for upgradeable contracts with proper access controls.",
+        "Testing: Comprehensive test coverage with fuzz testing should be standard for DeFi protocols."
+    ]
+    
+    post_text = random.choice(fallback_tips)
+    hashtags = generate_security_hashtags("security tips", content_type)
+    post_text += f" {hashtags}"
+    
     if len(post_text) > 280:
         post_text = post_text[:277] + "..."
     
@@ -603,6 +694,8 @@ def generate_audit_findings_analysis(articles):
     topic = article['title']
     image_url = article.get('image_url')
     
+    content_type = determine_content_type(topic)
+    
     prompt = f"""
     Summarize key security audit findings from: {topic}
     
@@ -613,11 +706,11 @@ def generate_audit_findings_analysis(articles):
     4. Recommendations for developers
     
     Format: Bullet-point style in a single paragraph
-    Length: 230-270 characters
-    Include relevant audit and security hashtags
+    Length: 200-240 characters
+    DO NOT include hashtags
     
     Example:
-    "Recent audit revealed critical reentrancy issues & medium-severity access control flaws. Common patterns: unsafe external calls, missing modifiers. Recommendation: implement checks-effects-interactions & proper RBAC. #Audit #SmartContracts #Security"
+    "Recent audit revealed critical reentrancy issues & medium-severity access control flaws. Common patterns: unsafe external calls, missing modifiers. Recommendation: implement checks-effects-interactions & proper RBAC."
     """
     
     try:
@@ -635,15 +728,23 @@ def generate_audit_findings_analysis(articles):
                 post_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                 post_text = post_text.replace('```', '').strip()
                 
-                # Add hashtags if missing
-                if not any('#' in post_text for tag in post_text.split()):
-                    hashtags = get_security_hashtags(topic)
-                    post_text += f" {hashtags}"
+                # Remove any hashtags
+                post_text = re.sub(r'#\w+', '', post_text).strip()
+                
+                # Generate AI-based hashtags
+                hashtags = generate_security_hashtags(topic, content_type)
+                post_text += f" {hashtags}"
                 
                 post_text = remove_ai_indicators(post_text)
                 
                 if len(post_text) > 280:
-                    post_text = post_text[:277] + "..."
+                    if len(hashtags) < 100:
+                        main_content = post_text[:-len(hashtags)]
+                        if len(main_content) > 180:
+                            main_content = main_content[:177] + "..."
+                        post_text = main_content + hashtags
+                    else:
+                        post_text = post_text[:277] + "..."
                 
                 print(f"✅ Audit findings analysis created ({len(post_text)} chars)")
                 return post_text, image_url
@@ -652,6 +753,23 @@ def generate_audit_findings_analysis(articles):
         print(f"❌ Audit analysis error: {e}")
     
     return create_security_fallback(), image_url
+
+def determine_content_type(topic):
+    """Determine content type from topic for hashtag generation"""
+    topic_lower = topic.lower()
+    
+    if any(term in topic_lower for term in ['smart contract', 'solidity', 'reentrancy', 'audit']):
+        return 'smart_contract'
+    elif any(term in topic_lower for term in ['exploit', 'hack', 'breach', 'incident']):
+        return 'incident'
+    elif any(term in topic_lower for term in ['zero knowledge', 'zk', 'cryptography', 'privacy']):
+        return 'cryptography'
+    elif any(term in topic_lower for term in ['defi', 'decentralized finance', 'protocol']):
+        return 'defi'
+    elif any(term in topic_lower for term in ['wallet', 'key', 'seed', 'mnemonic']):
+        return 'wallet_security'
+    else:
+        return 'general_security'
 
 def remove_ai_indicators(text):
     """Remove any phrases that sound AI-generated"""
@@ -669,25 +787,36 @@ def remove_ai_indicators(text):
     return ' '.join(text.split())
 
 def create_security_fallback():
-    """Create fallback security posts"""
+    """Create fallback security posts with AI-generated hashtags"""
     fallbacks = [
-        "Smart contract security is evolving rapidly. Recent trends show increasing focus on formal verification and automated vulnerability detection tools. #Web3Security #SmartContracts #Blockchain",
-        "DeFi security requires multiple layers: smart contract audits, economic security analysis, and incident response planning. No single solution provides complete protection. #DeFiSecurity #Audit #RiskManagement",
-        "Wallet security fundamentals: hardware wallets for storage, multi-sig for teams, and never interacting with suspicious dApps. Basic hygiene prevents most attacks. #WalletSecurity #Crypto #Web3",
-        "Zero-knowledge proofs are revolutionizing privacy and scaling. Understanding zk-SNARKs vs zk-STARKs is crucial for next-gen blockchain security. #ZeroKnowledge #ZKP #Cryptography",
-        "Cross-chain security remains challenging. Bridge vulnerabilities have caused billions in losses. Always verify bridge security audits before large transfers. #CrossChain #BridgeSecurity #Web3",
-        "Governance security: Time-locked proposals, multi-sig execution, and gradual decentralization prevent governance attacks in DeFi protocols. #Governance #DeFi #Security",
-        "Oracle manipulation attacks continue to plague DeFi. Using multiple data sources with aggregation mechanisms reduces single-point failure risks. #Oracle #DeFiSecurity #Web3",
-        "Formal verification mathematically proves smart contract correctness. While resource-intensive, it's becoming essential for high-value protocols. #FormalVerification #SmartContracts #Security",
-        "Incident response planning is often overlooked. Having a playbook for security breaches can mean the difference between recovery and collapse. #IncidentResponse #Security #Web3",
-        "Upgradeable contracts introduce new risks. Proper proxy patterns with transparent upgrade processes are essential for maintaining security during updates. #Upgradeability #SmartContracts #Security"
+        "Smart contract security is evolving rapidly with increased focus on formal verification and automated vulnerability detection.",
+        "DeFi security requires multiple layers: smart contract audits, economic analysis, and incident response planning for complete protection.",
+        "Wallet security fundamentals include hardware wallets for storage, multi-sig for teams, and avoiding suspicious dApp interactions.",
+        "Zero-knowledge proofs are revolutionizing privacy and scaling in blockchain. Understanding zk-SNARKs vs zk-STARKs is crucial for security.",
+        "Cross-chain security remains challenging with bridge vulnerabilities causing significant losses. Always verify bridge security audits.",
+        "Governance security requires time-locked proposals, multi-sig execution, and gradual decentralization to prevent governance attacks.",
+        "Oracle manipulation attacks continue in DeFi. Multiple data sources with aggregation reduce single-point failure risks significantly.",
+        "Formal verification mathematically proves smart contract correctness, becoming essential for high-value protocols despite resource intensity.",
+        "Incident response planning is often overlooked but critical. A proper playbook can mean recovery instead of collapse during breaches.",
+        "Upgradeable contracts introduce new risks. Proper proxy patterns with transparent processes are essential for security during updates."
     ]
     
     post_text = random.choice(fallbacks)
     
+    # Determine content type and generate hashtags
+    content_type = determine_content_type(post_text)
+    hashtags = generate_security_hashtags("security insights", content_type)
+    post_text += f" {hashtags}"
+    
     # Ensure proper length
     if len(post_text) > 280:
-        post_text = post_text[:277] + "..."
+        if len(hashtags) < 100:
+            main_content = post_text[:-len(hashtags)]
+            if len(main_content) > 180:
+                main_content = main_content[:177] + "..."
+            post_text = main_content + hashtags
+        else:
+            post_text = post_text[:277] + "..."
     
     return post_text
 
@@ -715,7 +844,7 @@ def main():
     print("🔐 Web3 Security Content Creator")
     print("=" * 50)
     print("💎 VALUABLE SECURITY INSIGHTS • NO PROMOTIONAL CONTENT")
-    print("🔗 RELEVANT HASHTAGS • TECHNICAL DEPTH")
+    print("🔗 AI-GENERATED HASHTAGS • TECHNICAL DEPTH")
     print("🤖 USING GEMINI 2.0 FLASH")
     print("=" * 50)
     
@@ -757,6 +886,10 @@ def main():
     print(f"📏 Character count: {len(post_text)}")
     print(f"🖼️ Image available: {'Yes' if image_url else 'No'}")
     
+    # Count hashtags
+    hashtag_count = len([t for t in post_text.split() if t.startswith('#')])
+    print(f"🔗 Hashtags generated: {hashtag_count}")
+    
     # Post to Twitter
     print("\n🚀 Posting security insights...")
     success = post_to_twitter(
@@ -772,7 +905,7 @@ def main():
         print("\n✅ Successfully posted security content!")
         print(f"🎯 Post type: {post_type.replace('_', ' ').title()}")
         print(f"🖼️ Image included: {'Yes' if image_url else 'No'}")
-        print(f"🔗 Hashtags: {len([t for t in post_text.split() if t.startswith('#')])}")
+        print(f"🔗 AI-generated hashtags: {hashtag_count}")
     else:
         print("\n❌ Failed to post.")
 
