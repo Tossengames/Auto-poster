@@ -20,7 +20,7 @@ genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-2.5-flash')
 
 # ================================
-# NEW: REDDIT RSS FEEDS - LIFE / WORK / RELATIONSHIP / INTERNET BEHAVIOR NICHE
+# REDDIT RSS FEEDS - LIFE / WORK / RELATIONSHIPS / INTERNET BEHAVIOR NICHE
 # ================================
 REDDIT_RSS_FEEDS = [
     "https://www.reddit.com/r/AskReddit/.rss",
@@ -35,12 +35,42 @@ posted_links = set()
 
 # ================================
 # TWITTER/X API FUNCTIONS
-# (UNCHANGED)
 # ================================
 
 def post_to_twitter(content, api_key, api_secret, access_token, access_token_secret, image_url=None):
-    # ... [keep your existing function exactly as-is] ...
-    pass
+    """Post content to Twitter/X (text-only, image_url ignored)"""
+    try:
+        print("🐦 Posting to Twitter/X...")
+        
+        # Ensure content is within Twitter limits
+        if len(content) > 280:
+            print(f"📏 Content too long ({len(content)} chars), truncating...")
+            content = content[:277] + "..."
+        
+        # Use v2 client
+        client_v2 = tweepy.Client(
+            consumer_key=api_key,
+            consumer_secret=api_secret,
+            access_token=access_token,
+            access_token_secret=access_token_secret
+        )
+        
+        response = client_v2.create_tweet(text=content)
+        
+        if response and response.data:
+            tweet_id = response.data['id']
+            print(f"🎉 Successfully tweeted! Tweet ID: {tweet_id}")
+            return True
+        else:
+            print("❌ Twitter post failed: No response data")
+            return False
+            
+    except tweepy.TweepyException as e:
+        print(f"❌ Twitter API error: {e}")
+        return False
+    except Exception as e:
+        print(f"💥 Twitter post error: {e}")
+        return False
 
 # ================================
 # CONTENT FUNCTIONS
@@ -59,7 +89,7 @@ def contains_political_content(text):
     return any(keyword in text_lower for keyword in POLITICAL_KEYWORDS)
 
 # ================================
-# NEW: PARSE REDDIT RSS
+# PARSE REDDIT RSS
 # ================================
 
 def parse_reddit_rss():
@@ -79,73 +109,62 @@ def parse_reddit_rss():
                     'summary': entry.get('summary', ''),
                     'published': datetime.now(),  # Reddit RSS doesn't have standard published date
                     'source': feed.feed.title if hasattr(feed.feed, 'title') else feed_url.split('//')[-1].split('/')[0],
-                    'images': []  # Reddit posts via RSS usually do not include images
+                    'images': []  # No images for Reddit RSS
                 })
         except Exception as e:
             print(f"Error parsing Reddit feed {feed_url}: {e}")
     return all_entries
 
 # ================================
-# MODIFY GENERATE ENGAGING POST TO USE REDDIT RSS
+# GENERATE ENGAGING POST
 # ================================
 
 def generate_engaging_post():
-    """Generate an engaging post using Reddit RSS"""
+    """Generate a single standalone, humorous or observational post using Reddit RSS"""
     entries = parse_reddit_rss()
     
     if not entries:
-        # fallback to simple default text if no Reddit entries
         return generate_fallback_post()
     
     entry = random.choice(entries)
     posted_links.add(entry['link'])
     
-    # No images for Reddit RSS by default
+    # Purely text-based, no images
     image_url = None
     
-    # Generate AI prompt
+    # AI prompt for a single, standalone tweet
     prompt = (
-        f"Write 3 short, witty, conversational tweets reacting to this online discussion:\n\n"
+        f"Write a single, standalone, witty, conversational tweet reacting to this online discussion:\n\n"
         f"Title: {entry['title']}\n"
         f"Summary: {entry['summary']}\n\n"
         f"Requirements:\n"
         f"- Observational, humorous, or relatable\n"
-        f"- Topics: life, work, relationships, internet behavior\n"
-        f"- No hashtags\n"
-        f"- Short, under 200 characters each\n"
+        f"- Standalone: must make sense by itself\n"
+        f"- Topic: life, work, relationships, internet behavior\n"
         f"- Use emojis sparingly\n"
-        f"- Sound like a human noticing online behavior\n"
+        f"- Maximum 200 characters\n"
+        f"- Do not include hashtags\n"
+        f"- No references to sources or Reddit\n"
     )
     
     try:
         response = model.generate_content(prompt)
         text_content = response.text.strip()
         text_content = re.sub(r'\*\*|\*|__|_', '', text_content)
-        
-        # Return the generated text and image (None)
         return text_content, image_url
+    
     except Exception as e:
         print(f"AI content generation error: {e}")
         return generate_fallback_post()
 
 def generate_fallback_post():
-    """Fallback Reddit-style humorous post"""
+    """Fallback single text-only Reddit-style humorous post"""
     fallbacks = [
-        {
-            'text': "Everyone wants to wake up at 5am but nobody wants to sleep early. 😴💭 What habit confuses you the most? 👇",
-            'image': None
-        },
-        {
-            'text': "We all ghost people online and then wonder why we feel lonely. 👀💬 Has this happened to you? 👇",
-            'image': None
-        },
-        {
-            'text': "People love productivity hacks but skip the actual work. 🤷‍♂️📈 Which one do you follow? 👇",
-            'image': None
-        }
+        "Everyone wants to wake up at 5am but nobody wants to sleep early. 😴💭 What habit confuses you the most?",
+        "We all ghost people online and then wonder why we feel lonely. 👀💬 Has this happened to you?",
+        "People love productivity hacks but skip the actual work. 🤷‍♂️📈 Which one do you actually follow?"
     ]
-    fallback = random.choice(fallbacks)
-    return fallback['text'], fallback['image']
+    return random.choice(fallbacks), None
 
 # ================================
 # MAIN EXECUTION
@@ -170,7 +189,6 @@ def main():
     
     print(f"📝 Post: {post_text}")
     print(f"📏 Character count: {len(post_text)}")
-    print(f"🖼️ Image: {'Yes' if image_url else 'No'}")
     
     print("\n🚀 Posting to Twitter...")
     success = post_to_twitter(
