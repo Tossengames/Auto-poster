@@ -5,7 +5,16 @@ import textwrap
 from io import BytesIO
 import feedparser
 import tweepy
-from PIL import Image, ImageDraw, ImageFont
+
+# Auto-install Pillow if missing
+import subprocess
+import sys
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "Pillow"])
+    from PIL import Image, ImageDraw, ImageFont
+
 import google.generativeai as genai
 
 # =============================
