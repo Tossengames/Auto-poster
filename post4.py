@@ -1,5 +1,5 @@
 import os
-import google.generativeai as genai
+import google.genai as genai
 import random
 import feedparser
 import re
@@ -17,9 +17,8 @@ TWITTER_ACCESS_TOKEN = os.getenv("TWITTER_ACCESS_TOKEN")
 TWITTER_ACCESS_TOKEN_SECRET = os.getenv("TWITTER_ACCESS_TOKEN_SECRET")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Initialize Gemini
+# Initialize Gemini with NEW API
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-pro')
 
 # =============================
 # RSS FEEDS
@@ -224,7 +223,7 @@ def parse_reddit_rss():
     return entries
 
 # =============================
-# CONTENT GENERATION
+# CONTENT GENERATION - USING NEW GEMINI API
 # =============================
 
 def generate_engaging_post():
@@ -261,7 +260,12 @@ def generate_engaging_post():
     """
     
     try:
-        response = model.generate_content(prompt)
+        # NEW GEMINI API SYNTAX
+        response = genai.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt
+        )
+        
         generated_text = response.text.strip()
         cleaned_text = clean_text(generated_text)
         
@@ -284,10 +288,15 @@ def generate_engaging_post():
             all_text = ' '.join(tweet_lines)
             hashtags = re.findall(r'#\w+', all_text)
             if not hashtags:
-                hashtags = ['#Thoughts', '#Life', '#Reflection']
+                print("❌ No hashtags found in AI response")
+                return None, None, None
             hashtag_line = ' '.join(hashtags[:3])
         
         hashtags = re.findall(r'#\w+', hashtag_line)
+        if len(hashtags) < 3:
+            print(f"❌ Only {len(hashtags)} hashtags found, need exactly 3")
+            return None, None, None
+            
         hashtag_line = ' '.join(hashtags[:3])
         
         tweet_text_only = '\n\n'.join(tweet_lines)
@@ -340,6 +349,9 @@ def main():
     if not post_text:
         print("❌ Failed to generate content. Skipping post.")
         return
+    
+    print(f"\nGenerated Hashtags: {hashtags}")
+    print(f"\nTweet:\n{post_text}\n")
     
     print("\n" + "="*50)
     print("POSTING TO TWITTER")
