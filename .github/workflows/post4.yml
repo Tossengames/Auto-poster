@@ -1,16 +1,24 @@
-name: funny 
+name: fun
 
 on:
-  workflow_dispatch:    # Manual trigger
+  # 1. Trigger for scheduled runs twice a day
   schedule:
-    - cron: '0 9 * * *' # 09:00 UTC daily
+    # Runs at 09:00 and 21:00 UTC every day. Use 'crontab guru' to adjust times.
+    - cron: '0 9,21 * * *'
+  
+  # 2. Trigger for manual runs (from GitHub UI or CLI)
+  workflow_dispatch:
+    inputs:
+      run_reason:
+        description: 'Reason for manual run'
+        required: false
+        default: 'Manual trigger'
 
 jobs:
-  run-post4:
+  post-tweet:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout repository
+      - name: Checkout repository code
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -20,15 +28,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install google-genai==1.0.0 tweepy feedparser
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Run script
+      - name: Run Twitter bot script
         env:
           TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
           TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
           TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
           TWITTER_ACCESS_TOKEN_SECRET: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          echo "Running Twitter poster script"
-          python post4.py
+        run: python post4.py
