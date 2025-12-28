@@ -4,6 +4,7 @@ import random
 import feedparser
 import re
 import tweepy
+import requests
 
 # Configuration
 TWITTER_API_KEY = os.getenv("TWITTER_API_KEY")
@@ -48,6 +49,32 @@ def post_to_twitter(content, api_key, api_secret, access_token, access_token_sec
         print(f"Twitter post error: {e}")
         return False
 
+def get_trending_hashtags_for_text(text, count=3):
+    """Fetch trending hashtags and select ones relevant to the tweet text"""
+    try:
+        client = tweepy.Client(
+            consumer_key=TWITTER_API_KEY,
+            consumer_secret=TWITTER_API_SECRET,
+            access_token=TWITTER_ACCESS_TOKEN,
+            access_token_secret=TWITTER_ACCESS_TOKEN_SECRET
+        )
+        # Get US trends (WOEID 23424977)
+        bearer_token = client._bearer_token
+        url = "https://api.twitter.com/1.1/trends/place.json?id=23424977"
+        headers = {"Authorization": f"Bearer {bearer_token}"}
+        resp = requests.get(url, headers=headers).json()
+        trends = resp[0]["trends"]
+        hashtags = [t["name"] for t in trends if t["name"].startswith("#")]
+
+        # Filter hashtags to be relevant to words in the text
+        words = set(re.findall(r'\b[a-zA-Z]{3,}\b', text.lower()))
+        relevant = [h for h in hashtags if any(w in h.lower() for w in words)]
+        random.shuffle(relevant)
+        return relevant[:count] if relevant else hashtags[:count]
+    except Exception as e:
+        print(f"Failed to fetch trending hashtags: {e}")
+        return []
+
 # =============================
 # HELPERS
 # =============================
@@ -58,19 +85,6 @@ def contains_political_content(text):
         'tax','war','political','democrat','republican','vote'
     ]
     return any(k in text.lower() for k in POLITICAL_KEYWORDS) if text else False
-
-def extract_hashtags_from_text(text, max_tags=3):
-    """Simple hashtag creator: grab frequent meaningful words from text."""
-    words = re.findall(r'\b[a-zA-Z]{4,}\b', text.lower())
-    common = sorted(set(words), key=lambda w: -words.count(w))
-    tags = []
-    for w in common:
-        tag = "#" + w.capitalize()
-        if tag not in tags:
-            tags.append(tag)
-        if len(tags) == max_tags:
-            break
-    return " ".join(tags)
 
 # =============================
 # PARSE REDDIT RSS
@@ -103,13 +117,10 @@ def generate_engaging_post():
     entries = parse_reddit_rss()
     if not entries:
         print("No valid RSS entries found.")
-        return None, None
-    
+        return None
+
     entry = random.choice(entries)
     posted_links.add(entry['link'])
-    
-    # Build hashtags
-    hashtag_text = extract_hashtags_from_text(entry['title'] + " " + entry['summary'])
     
     prompt = (
         f"Create ONE standalone, easy-to-read tweet about this online discussion:\n\n"
@@ -118,27 +129,23 @@ def generate_engaging_post():
         f"Requirements:\n"
         f"- Funny/observational about modern life, work, relationships or internet behavior\n"
         f"- Use line breaks and emojis for readability\n"
-        f"- Include about 3 hashtags (not at start)\n"
         f"- Must make sense by itself\n"
-        f"- Max 250 characters including hashtags\n"
-        f"- Do NOT mention Reddit or sources\n\n"
-        f"Example format:\n"
-        f"😂 First thought here.\n\n"
-        f"🤔 Another thought.\n\n"
-        f"#Hashtag1 #Hashtag2 #Hashtag3"
+        f"- Max 250 characters\n"
+        f"- Do NOT mention Reddit or sources"
     )
     
     try:
         response = model.generate_content(prompt)
         text = response.text.strip()
         text = re.sub(r'\*\*|\*|__|_', '', text).strip()
-        final_tweet = f"{text}\n\n{hashtag_text}"
+        hashtags = get_trending_hashtags_for_text(text, count=3)
+        final_tweet = f"{text}\n\n{' '.join(hashtags)}" if hashtags else text
         if len(final_tweet) > 280:
             final_tweet = final_tweet[:277] + "..."
-        return final_tweet, None
+        return final_tweet
     except Exception as e:
         print(f"AI generation failed: {e}")
-        return None, None
+        return None
 
 # =============================
 # MAIN
@@ -154,9 +161,9 @@ def main():
         print("❌ Missing GEMINI_API_KEY")
         return
     
-    post_text, _ = generate_engaging_post()
+    post_text = generate_engaging_post()
     if not post_text:
-        print("❌ AI failed to generate a tweet. Skipping post.")
+        print("❌ AI failed to generate a tweet or no trending hashtags found. Skipping post.")
         return
     
     print(f"Tweet:\n{post_text}\n")
