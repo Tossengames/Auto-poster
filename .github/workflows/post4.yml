@@ -1,4 +1,4 @@
-name: funny tweet 
+name: funny 
 
 on:
   workflow_dispatch:    # Manual trigger
@@ -19,7 +19,8 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install google-genai tweepy feedparser Pillow
+        run: |
+          pip install google-genai==1.0.0 tweepy feedparser
 
       - name: Run script
         env:
