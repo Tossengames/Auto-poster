@@ -4,7 +4,8 @@ import random
 import feedparser
 import re
 import tweepy
-import requests
+from PIL import Image, ImageDraw, ImageFont
+import io
 
 # Configuration
 TWITTER_API_KEY = os.getenv("TWITTER_API_KEY")
@@ -32,48 +33,22 @@ posted_links = set()
 # TWITTER API
 # =============================
 
-def post_to_twitter(content, api_key, api_secret, access_token, access_token_secret):
-    """Post text-only tweet"""
+def post_image_to_twitter(image_bytes, caption, api_key, api_secret, access_token, access_token_secret):
+    """Post tweet with image and caption"""
     try:
-        if len(content) > 280:
-            content = content[:277] + "..."
         client_v2 = tweepy.Client(
             consumer_key=api_key,
             consumer_secret=api_secret,
             access_token=access_token,
             access_token_secret=access_token_secret
         )
-        response = client_v2.create_tweet(text=content)
+        # Upload media
+        media = client_v2.upload_media(filename="tweet.png", file=image_bytes)
+        response = client_v2.create_tweet(text=caption, media_ids=[media.media_id])
         return bool(response and response.data)
     except Exception as e:
         print(f"Twitter post error: {e}")
         return False
-
-def get_trending_hashtags_for_text(text, count=3):
-    """Fetch trending hashtags and select ones relevant to the tweet text"""
-    try:
-        client = tweepy.Client(
-            consumer_key=TWITTER_API_KEY,
-            consumer_secret=TWITTER_API_SECRET,
-            access_token=TWITTER_ACCESS_TOKEN,
-            access_token_secret=TWITTER_ACCESS_TOKEN_SECRET
-        )
-        # Get US trends (WOEID 23424977)
-        bearer_token = client._bearer_token
-        url = "https://api.twitter.com/1.1/trends/place.json?id=23424977"
-        headers = {"Authorization": f"Bearer {bearer_token}"}
-        resp = requests.get(url, headers=headers).json()
-        trends = resp[0]["trends"]
-        hashtags = [t["name"] for t in trends if t["name"].startswith("#")]
-
-        # Filter hashtags to be relevant to words in the text
-        words = set(re.findall(r'\b[a-zA-Z]{3,}\b', text.lower()))
-        relevant = [h for h in hashtags if any(w in h.lower() for w in words)]
-        random.shuffle(relevant)
-        return relevant[:count] if relevant else hashtags[:count]
-    except Exception as e:
-        print(f"Failed to fetch trending hashtags: {e}")
-        return []
 
 # =============================
 # HELPERS
@@ -110,6 +85,40 @@ def parse_reddit_rss():
     return entries
 
 # =============================
+# CREATE IMAGE
+# =============================
+
+def create_text_image(text, width=800, height=600):
+    # Random background color
+    bg_color = tuple(random.randint(100, 255) for _ in range(3))
+    image = Image.new('RGB', (width, height), color=bg_color)
+    draw = ImageDraw.Draw(image)
+
+    # Use default PIL font
+    font = ImageFont.load_default()
+
+    # Wrap text
+    lines = []
+    max_chars_per_line = 40
+    for paragraph in text.split('\n'):
+        paragraph = paragraph.strip()
+        while len(paragraph) > 0:
+            lines.append(paragraph[:max_chars_per_line])
+            paragraph = paragraph[max_chars_per_line:]
+    
+    # Draw text
+    y_text = 20
+    for line in lines:
+        draw.text((20, y_text), line, fill=(0,0,0), font=font)
+        y_text += font.getsize(line)[1] + 5
+    
+    # Save to bytes
+    img_byte_arr = io.BytesIO()
+    image.save(img_byte_arr, format='PNG')
+    img_byte_arr.seek(0)
+    return img_byte_arr
+
+# =============================
 # GENERATE TWEET
 # =============================
 
@@ -117,19 +126,20 @@ def generate_engaging_post():
     entries = parse_reddit_rss()
     if not entries:
         print("No valid RSS entries found.")
-        return None
+        return None, None
 
     entry = random.choice(entries)
     posted_links.add(entry['link'])
     
     prompt = (
-        f"Create ONE standalone, easy-to-read tweet about this online discussion:\n\n"
+        f"Create ONE standalone, funny/observational tweet about this online discussion:\n\n"
         f"Title: {entry['title']}\n"
         f"Summary: {entry['summary']}\n\n"
         f"Requirements:\n"
         f"- Funny/observational about modern life, work, relationships or internet behavior\n"
+        f"- Include 3 hashtags at the end of the tweet\n"
         f"- Use line breaks and emojis for readability\n"
-        f"- Must make sense by itself\n"
+        f"- Must make sense standalone\n"
         f"- Max 250 characters\n"
         f"- Do NOT mention Reddit or sources"
     )
@@ -138,14 +148,16 @@ def generate_engaging_post():
         response = model.generate_content(prompt)
         text = response.text.strip()
         text = re.sub(r'\*\*|\*|__|_', '', text).strip()
-        hashtags = get_trending_hashtags_for_text(text, count=3)
-        final_tweet = f"{text}\n\n{' '.join(hashtags)}" if hashtags else text
-        if len(final_tweet) > 280:
-            final_tweet = final_tweet[:277] + "..."
-        return final_tweet
+        
+        # Extract hashtags from AI-generated text (assume last line has them)
+        lines = text.split("\n")
+        hashtags = lines[-1] if lines[-1].startswith("#") else ""
+        tweet_text = "\n".join(lines[:-1]) if hashtags else text
+        
+        return tweet_text, hashtags
     except Exception as e:
         print(f"AI generation failed: {e}")
-        return None
+        return None, None
 
 # =============================
 # MAIN
@@ -161,19 +173,25 @@ def main():
         print("❌ Missing GEMINI_API_KEY")
         return
     
-    post_text = generate_engaging_post()
+    post_text, hashtags = generate_engaging_post()
     if not post_text:
-        print("❌ AI failed to generate a tweet or no trending hashtags found. Skipping post.")
+        print("❌ AI failed to generate a tweet. Skipping post.")
         return
     
-    print(f"Tweet:\n{post_text}\n")
+    print(f"Generated Tweet Text:\n{post_text}")
+    print(f"Hashtags for Caption:\n{hashtags}\n")
     
-    success = post_to_twitter(
-        post_text,
-        TWITTER_API_KEY,
-        TWITTER_API_SECRET,
-        TWITTER_ACCESS_TOKEN,
-        TWITTER_ACCESS_TOKEN_SECRET
+    # Create image with text only (no hashtags)
+    img_bytes = create_text_image(post_text)
+    
+    # Post image with hashtags as caption
+    success = post_image_to_twitter(
+        img_bytes,
+        caption=hashtags,
+        api_key=TWITTER_API_KEY,
+        api_secret=TWITTER_API_SECRET,
+        access_token=TWITTER_ACCESS_TOKEN,
+        access_token_secret=TWITTER_ACCESS_TOKEN_SECRET
     )
     
     print("✅ Posted!" if success else "❌ Failed to post.")
