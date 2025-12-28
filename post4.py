@@ -1,11 +1,8 @@
 import os
 import google.generativeai as genai
-import requests
 import random
 import feedparser
-from datetime import datetime
 import re
-import time
 import tweepy
 
 # Configuration
@@ -19,9 +16,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-2.5-flash')
 
-# ================================
-# REDDIT RSS FEEDS - LIFE / WORK / RELATIONSHIPS / INTERNET BEHAVIOR NICHE
-# ================================
+# Reddit RSS feeds for niche
 REDDIT_RSS_FEEDS = [
     "https://www.reddit.com/r/AskReddit/.rss",
     "https://www.reddit.com/r/relationships/.rss",
@@ -30,153 +25,127 @@ REDDIT_RSS_FEEDS = [
     "https://www.reddit.com/r/technology/.rss"
 ]
 
-# Cache to avoid duplicate posts
 posted_links = set()
 
-# ================================
-# TWITTER/X API FUNCTIONS
-# ================================
+# =============================
+# TWITTER API
+# =============================
 
-def post_to_twitter(content, api_key, api_secret, access_token, access_token_secret, image_url=None):
-    """Post content to Twitter/X (text-only, image_url ignored)"""
+def post_to_twitter(content, api_key, api_secret, access_token, access_token_secret):
+    """Post text-only tweet"""
     try:
-        print("🐦 Posting to Twitter/X...")
-        
-        # Ensure content is within Twitter limits
         if len(content) > 280:
-            print(f"📏 Content too long ({len(content)} chars), truncating...")
             content = content[:277] + "..."
-        
-        # Use v2 client
         client_v2 = tweepy.Client(
             consumer_key=api_key,
             consumer_secret=api_secret,
             access_token=access_token,
             access_token_secret=access_token_secret
         )
-        
         response = client_v2.create_tweet(text=content)
-        
-        if response and response.data:
-            tweet_id = response.data['id']
-            print(f"🎉 Successfully tweeted! Tweet ID: {tweet_id}")
-            return True
-        else:
-            print("❌ Twitter post failed: No response data")
-            return False
-            
-    except tweepy.TweepyException as e:
-        print(f"❌ Twitter API error: {e}")
-        return False
+        return bool(response and response.data)
     except Exception as e:
-        print(f"💥 Twitter post error: {e}")
+        print(f"Twitter post error: {e}")
         return False
 
-# ================================
-# CONTENT FUNCTIONS
-# ================================
+# =============================
+# HELPERS
+# =============================
 
 def contains_political_content(text):
-    """Check if text contains political keywords"""
     POLITICAL_KEYWORDS = [
-        'trump', 'biden', 'president', 'election', 'government', 'policy', 
-        'tariff', 'tax', 'war', 'conflict', 'political', 'democrat', 'republican',
-        'congress', 'senate', 'white house', 'administration', 'vote', 'campaign'
+        'trump','biden','president','election','government','policy',
+        'tax','war','political','democrat','republican','vote'
     ]
-    if not text:
-        return False
-    text_lower = text.lower()
-    return any(keyword in text_lower for keyword in POLITICAL_KEYWORDS)
+    return any(k in text.lower() for k in POLITICAL_KEYWORDS) if text else False
 
-# ================================
+def extract_hashtags_from_text(text, max_tags=3):
+    """Simple hashtag creator: grab frequent meaningful words from text."""
+    words = re.findall(r'\b[a-zA-Z]{4,}\b', text.lower())
+    common = sorted(set(words), key=lambda w: -words.count(w))
+    tags = []
+    for w in common:
+        tag = "#" + w.capitalize()
+        if tag not in tags:
+            tags.append(tag)
+        if len(tags) == max_tags:
+            break
+    return " ".join(tags)
+
+# =============================
 # PARSE REDDIT RSS
-# ================================
+# =============================
 
 def parse_reddit_rss():
-    """Parse Reddit RSS feeds and return non-political entries"""
-    all_entries = []
-    for feed_url in REDDIT_RSS_FEEDS:
+    entries = []
+    for url in REDDIT_RSS_FEEDS:
         try:
-            feed = feedparser.parse(feed_url)
+            feed = feedparser.parse(url)
             for entry in feed.entries:
                 if entry.link in posted_links:
                     continue
-                if contains_political_content(entry.title) or contains_political_content(entry.get('summary', '')):
+                if contains_political_content(entry.title) or contains_political_content(entry.get('summary','')):
                     continue
-                all_entries.append({
+                entries.append({
                     'title': entry.title,
                     'link': entry.link,
-                    'summary': entry.get('summary', ''),
-                    'published': datetime.now(),  # Reddit RSS doesn't have standard published date
-                    'source': feed.feed.title if hasattr(feed.feed, 'title') else feed_url.split('//')[-1].split('/')[0],
-                    'images': []  # No images for Reddit RSS
+                    'summary': entry.get('summary','')
                 })
         except Exception as e:
-            print(f"Error parsing Reddit feed {feed_url}: {e}")
-    return all_entries
+            print(f"RSS error {url}: {e}")
+    return entries
 
-# ================================
-# GENERATE ENGAGING POST
-# ================================
+# =============================
+# GENERATE TWEET
+# =============================
 
 def generate_engaging_post():
-    """Generate a single standalone, humorous or observational post using Reddit RSS"""
     entries = parse_reddit_rss()
-    
     if not entries:
-        return generate_fallback_post()
+        print("No valid RSS entries found.")
+        return None, None
     
     entry = random.choice(entries)
     posted_links.add(entry['link'])
     
-    # Purely text-based, no images
-    image_url = None
+    # Build hashtags
+    hashtag_text = extract_hashtags_from_text(entry['title'] + " " + entry['summary'])
     
-    # AI prompt for a single, standalone tweet
     prompt = (
-        f"Write a single, standalone, witty, conversational tweet reacting to this online discussion:\n\n"
+        f"Create ONE standalone, easy-to-read tweet about this online discussion:\n\n"
         f"Title: {entry['title']}\n"
         f"Summary: {entry['summary']}\n\n"
         f"Requirements:\n"
-        f"- Observational, humorous, or relatable\n"
-        f"- Standalone: must make sense by itself\n"
-        f"- Topic: life, work, relationships, internet behavior\n"
-        f"- Use emojis sparingly\n"
-        f"- Maximum 200 characters\n"
-        f"- Do not include hashtags\n"
-        f"- No references to sources or Reddit\n"
+        f"- Funny/observational about modern life, work, relationships or internet behavior\n"
+        f"- Use line breaks and emojis for readability\n"
+        f"- Include about 3 hashtags (not at start)\n"
+        f"- Must make sense by itself\n"
+        f"- Max 250 characters including hashtags\n"
+        f"- Do NOT mention Reddit or sources\n\n"
+        f"Example format:\n"
+        f"😂 First thought here.\n\n"
+        f"🤔 Another thought.\n\n"
+        f"#Hashtag1 #Hashtag2 #Hashtag3"
     )
     
     try:
         response = model.generate_content(prompt)
-        text_content = response.text.strip()
-        text_content = re.sub(r'\*\*|\*|__|_', '', text_content)
-        return text_content, image_url
-    
+        text = response.text.strip()
+        text = re.sub(r'\*\*|\*|__|_', '', text).strip()
+        final_tweet = f"{text}\n\n{hashtag_text}"
+        if len(final_tweet) > 280:
+            final_tweet = final_tweet[:277] + "..."
+        return final_tweet, None
     except Exception as e:
-        print(f"AI content generation error: {e}")
-        return generate_fallback_post()
+        print(f"AI generation failed: {e}")
+        return None, None
 
-def generate_fallback_post():
-    """Fallback single text-only Reddit-style humorous post"""
-    fallbacks = [
-        "Everyone wants to wake up at 5am but nobody wants to sleep early. 😴💭 What habit confuses you the most?",
-        "We all ghost people online and then wonder why we feel lonely. 👀💬 Has this happened to you?",
-        "People love productivity hacks but skip the actual work. 🤷‍♂️📈 Which one do you actually follow?"
-    ]
-    return random.choice(fallbacks), None
-
-# ================================
-# MAIN EXECUTION
-# ================================
+# =============================
+# MAIN
+# =============================
 
 def main():
     print("🐦 Reddit Content - Twitter Edition")
-    print("=" * 50)
-    print("💬 LIFE / WORK / RELATIONSHIPS / INTERNET BEHAVIOR POSTS")
-    print("🌟 OBSERVATIONAL & HUMOROUS TONE")
-    print("🤖 USING GEMINI 2.5 FLASH")
-    print("=" * 50)
     
     if not all([TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET]):
         print("❌ Missing Twitter API credentials")
@@ -185,25 +154,22 @@ def main():
         print("❌ Missing GEMINI_API_KEY")
         return
     
-    post_text, image_url = generate_engaging_post()
+    post_text, _ = generate_engaging_post()
+    if not post_text:
+        print("❌ AI failed to generate a tweet. Skipping post.")
+        return
     
-    print(f"📝 Post: {post_text}")
-    print(f"📏 Character count: {len(post_text)}")
+    print(f"Tweet:\n{post_text}\n")
     
-    print("\n🚀 Posting to Twitter...")
     success = post_to_twitter(
-        post_text, 
-        TWITTER_API_KEY, 
-        TWITTER_API_SECRET, 
-        TWITTER_ACCESS_TOKEN, 
-        TWITTER_ACCESS_TOKEN_SECRET,
-        image_url
+        post_text,
+        TWITTER_API_KEY,
+        TWITTER_API_SECRET,
+        TWITTER_ACCESS_TOKEN,
+        TWITTER_ACCESS_TOKEN_SECRET
     )
     
-    if success:
-        print("\n✅ Successfully posted to Twitter!")
-    else:
-        print("\n❌ Failed to post to Twitter.")
+    print("✅ Posted!" if success else "❌ Failed to post.")
 
 if __name__ == "__main__":
     main()
