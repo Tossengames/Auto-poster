@@ -14,8 +14,9 @@ TWITTER_ACCESS_TOKEN = os.getenv("TWITTER_ACCESS_TOKEN")
 TWITTER_ACCESS_TOKEN_SECRET = os.getenv("TWITTER_ACCESS_TOKEN_SECRET")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Initialize Gemini with NEW API
-genai.configure(api_key=GEMINI_API_KEY)
+# Initialize Gemini with NEW API - DIFFERENT SYNTAX
+# No configure() needed, just set the API key as parameter
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 # =============================
 # RSS FEEDS
@@ -175,7 +176,7 @@ def generate_engaging_post():
     
     try:
         # NEW GEMINI API SYNTAX
-        response = genai.models.generate_content(
+        response = client.models.generate_content(
             model="gemini-2.0-flash",
             contents=prompt
         )
