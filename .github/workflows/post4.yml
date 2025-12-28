@@ -5,7 +5,7 @@ on:
     # Run 2 times per day at optimal USA times
     # 9:00 AM EST = 14:00 UTC (morning engagement)
     # 3:00 PM EST = 20:00 UTC (afternoon engagement)
-    #- cron: '0 14 * * *'
+    - cron: '0 14 * * *'
   workflow_dispatch:  # Allow manual triggering
 
 jobs:
