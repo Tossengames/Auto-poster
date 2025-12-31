@@ -4,7 +4,9 @@ import feedparser
 import re
 import tweepy
 
-# ✅ NEW Gemini SDK (FIXED)
+# =============================
+# GEMINI (NEW SDK)
+# =============================
 from google import genai
 
 # =============================
@@ -18,7 +20,7 @@ TWITTER_ACCESS_TOKEN_SECRET = os.getenv("TWITTER_ACCESS_TOKEN_SECRET")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # =============================
-# INITIALIZE GEMINI (FIXED)
+# INITIALIZE GEMINI
 # =============================
 
 client = genai.Client(api_key=GEMINI_API_KEY)
@@ -71,20 +73,6 @@ def contains_political_content(text):
     ]
     return any(k in text.lower() for k in POLITICAL_KEYWORDS) if text else False
 
-def extract_hashtags_from_text(text, max_tags=3):
-    words = re.findall(r'\b[a-zA-Z]{4,}\b', text.lower())
-    common = sorted(set(words), key=lambda w: -words.count(w))
-    tags = []
-
-    for w in common:
-        tag = "#" + w.capitalize()
-        if tag not in tags:
-            tags.append(tag)
-        if len(tags) == max_tags:
-            break
-
-    return " ".join(tags)
-
 # =============================
 # PARSE REDDIT RSS
 # =============================
@@ -112,7 +100,7 @@ def parse_reddit_rss():
     return entries
 
 # =============================
-# GENERATE TWEET (FIXED)
+# GENERATE TWEET (NEUTRAL VOICE)
 # =============================
 
 def generate_engaging_post():
@@ -124,29 +112,27 @@ def generate_engaging_post():
     entry = random.choice(entries)
     posted_links.add(entry['link'])
 
-    hashtag_text = extract_hashtags_from_text(
-        entry['title'] + " " + entry['summary']
-    )
-
     prompt = (
         f"Create ONE standalone, easy-to-read tweet about this online discussion:\n\n"
         f"Title: {entry['title']}\n"
         f"Summary: {entry['summary']}\n\n"
         f"Requirements:\n"
-        f"- Funny/observational about modern life, work, relationships or internet behavior\n"
+        f"- Funny or insightful observation about modern life, work, relationships, or internet culture\n"
+        f"- MUST be written in third-person or neutral tone\n"
+        f"- DO NOT use first-person words (I, me, my, we, our, us)\n"
+        f"- No personal storytelling\n"
         f"- Use line breaks and emojis for readability\n"
-        f"- Include about 3 hashtags (not at start)\n"
+        f"- Include about 3 hashtags at the END\n"
         f"- Must make sense by itself\n"
-        f"- Max 250 characters including hashtags\n"
+        f"- Max 250 characters\n"
         f"- Do NOT mention Reddit or sources\n\n"
-        f"Example format:\n"
-        f"😂 First thought here.\n\n"
-        f"🤔 Another thought.\n\n"
-        f"#Hashtag1 #Hashtag2 #Hashtag3"
+        f"Example style:\n"
+        f"People say technology saves time.\n"
+        f"Funny how everyone feels busier than ever. 🤔\n\n"
+        f"#ModernLife #TechCulture #WorkLife"
     )
 
     try:
-        # ✅ NEW SAFE GEMINI CALL
         response = client.models.generate_content(
             model=MODEL_NAME,
             contents=prompt
@@ -162,9 +148,16 @@ def generate_engaging_post():
         if not text:
             raise ValueError("Gemini returned no text content")
 
+        # Clean markdown
         text = re.sub(r'\*\*|\*|__|_', '', text).strip()
 
-        final_tweet = f"{text}\n\n{hashtag_text}"
+        # Remove duplicate hashtags
+        text = re.sub(r'(#\w+)(\s+\1)+', r'\1', text)
+
+        # HARD safety: remove first-person if any slip through
+        text = re.sub(r'\b(I|me|my|we|our|us)\b', '', text, flags=re.IGNORECASE)
+
+        final_tweet = text
 
         if len(final_tweet) > 280:
             final_tweet = final_tweet[:277] + "..."
