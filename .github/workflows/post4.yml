@@ -1,32 +1,25 @@
 name: Run Twitter Bot x
 on:
-  # Scheduled runs at 9 AM and 9 PM UTC
   schedule:
     - cron: '0 9,21 * * *'
-  
-  # Manual trigger option
   workflow_dispatch:
 
 jobs:
   post-tweet:
     runs-on: ubuntu-latest
     steps:
-      # 1. Get your code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Set up Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # 3. Install ALL required packages
       - name: Install packages
         run: |
-          pip install google-generativeai feedparser tweepy
+          pip install google-genai feedparser tweepy
 
-      # 4. Run your bot script with API keys
       - name: Execute bot
         env:
           TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
