@@ -3,6 +3,7 @@ import random
 import feedparser
 import re
 import tweepy
+import time
 
 # =============================
 # GEMINI (NEW SDK)
@@ -103,70 +104,98 @@ def parse_reddit_rss():
 # GENERATE TWEET (NEUTRAL VOICE)
 # =============================
 
-def generate_engaging_post():
-    entries = parse_reddit_rss()
+def generate_engaging_post(max_retries=3):
+    entries = []
+    
+    # Try multiple times to fetch RSS entries
+    for retry in range(max_retries):
+        print(f"Attempt {retry + 1}/{max_retries} to fetch RSS entries...")
+        entries = parse_reddit_rss()
+        
+        if entries:
+            print(f"✓ Found {len(entries)} valid entries")
+            break
+        elif retry < max_retries - 1:
+            print(f"✗ No entries found, waiting 2 seconds before retry...")
+            time.sleep(2)  # Brief pause before retry
+    
     if not entries:
-        print("No valid RSS entries found.")
+        print("❌ No valid RSS entries found after all retries.")
         return None, None
+    
+    # Try different entries if generation fails
+    for attempt in range(min(3, len(entries))):  # Try up to 3 different entries
+        entry = random.choice(entries)
+        entries.remove(entry)  # Remove from list to avoid trying same entry again
+        
+        posted_links.add(entry['link'])
 
-    entry = random.choice(entries)
-    posted_links.add(entry['link'])
-
-    prompt = (
-        f"Create ONE standalone, easy-to-read tweet about this online discussion:\n\n"
-        f"Title: {entry['title']}\n"
-        f"Summary: {entry['summary']}\n\n"
-        f"Requirements:\n"
-        f"- Funny or insightful observation about modern life, work, relationships, or internet culture\n"
-        f"- MUST be written in third-person or neutral tone\n"
-        f"- DO NOT use first-person words (I, me, my, we, our, us)\n"
-        f"- No personal storytelling\n"
-        f"- Use line breaks and emojis for readability\n"
-        f"- Include about 3 hashtags at the END\n"
-        f"- Must make sense by itself\n"
-        f"- Max 250 characters\n"
-        f"- Do NOT mention Reddit or sources\n\n"
-        f"Example style:\n"
-        f"People say technology saves time.\n"
-        f"Funny how everyone feels busier than ever. 🤔\n\n"
-        f"#ModernLife #TechCulture #WorkLife"
-    )
-
-    try:
-        response = client.models.generate_content(
-            model=MODEL_NAME,
-            contents=prompt
+        prompt = (
+            f"Create ONE standalone, easy-to-read tweet about this online discussion:\n\n"
+            f"Title: {entry['title']}\n"
+            f"Summary: {entry['summary']}\n\n"
+            f"Requirements:\n"
+            f"- Funny or insightful observation about modern life, work, relationships, or internet culture\n"
+            f"- MUST be written in third-person or neutral tone\n"
+            f"- DO NOT use first-person words (I, me, my, we, our, us)\n"
+            f"- No personal storytelling\n"
+            f"- Use line breaks and emojis for readability\n"
+            f"- Include about 3 hashtags at the END\n"
+            f"- Must make sense by itself\n"
+            f"- Max 250 characters\n"
+            f"- Do NOT mention Reddit or sources\n\n"
+            f"Example style:\n"
+            f"People say technology saves time.\n"
+            f"Funny how everyone feels busier than ever. 🤔\n\n"
+            f"#ModernLife #TechCulture #WorkLife"
         )
 
-        text = ""
-        if response and response.candidates:
-            for part in response.candidates[0].content.parts:
-                if hasattr(part, "text") and part.text:
-                    text += part.text
+        try:
+            print(f"Attempting to generate tweet from: {entry['title'][:50]}...")
+            response = client.models.generate_content(
+                model=MODEL_NAME,
+                contents=prompt
+            )
 
-        text = text.strip()
-        if not text:
-            raise ValueError("Gemini returned no text content")
+            text = ""
+            if response and response.candidates:
+                for part in response.candidates[0].content.parts:
+                    if hasattr(part, "text") and part.text:
+                        text += part.text
 
-        # Clean markdown
-        text = re.sub(r'\*\*|\*|__|_', '', text).strip()
+            text = text.strip()
+            if not text:
+                print(f"✗ Gemini returned empty content for this entry, trying another...")
+                if attempt < min(2, len(entries)):  # If not last attempt
+                    time.sleep(1)  # Brief pause before trying next entry
+                continue
 
-        # Remove duplicate hashtags
-        text = re.sub(r'(#\w+)(\s+\1)+', r'\1', text)
+            # Clean markdown
+            text = re.sub(r'\*\*|\*|__|_', '', text).strip()
 
-        # HARD safety: remove first-person if any slip through
-        text = re.sub(r'\b(I|me|my|we|our|us)\b', '', text, flags=re.IGNORECASE)
+            # Remove duplicate hashtags
+            text = re.sub(r'(#\w+)(\s+\1)+', r'\1', text)
 
-        final_tweet = text
+            # HARD safety: remove first-person if any slip through
+            text = re.sub(r'\b(I|me|my|we|our|us)\b', '', text, flags=re.IGNORECASE)
 
-        if len(final_tweet) > 280:
-            final_tweet = final_tweet[:277] + "..."
+            final_tweet = text
 
-        return final_tweet, None
+            if len(final_tweet) > 280:
+                final_tweet = final_tweet[:277] + "..."
 
-    except Exception as e:
-        print(f"AI generation failed: {e}")
-        return None, None
+            print(f"✓ Successfully generated tweet from entry {attempt + 1}")
+            return final_tweet, None
+
+        except Exception as e:
+            print(f"✗ AI generation failed for this entry: {e}")
+            if attempt < min(2, len(entries)):  # If not last attempt
+                print("Trying another entry...")
+                time.sleep(1)  # Brief pause before trying next entry
+            continue
+    
+    print("❌ Failed to generate tweet from all attempted entries.")
+    return None, None
 
 # =============================
 # MAIN
@@ -174,6 +203,7 @@ def generate_engaging_post():
 
 def main():
     print("🐦 Reddit Content - Twitter Edition")
+    print("=" * 40)
 
     if not all([
         TWITTER_API_KEY,
@@ -188,13 +218,26 @@ def main():
         print("❌ Missing GEMINI_API_KEY")
         return
 
+    print("Starting content generation process...")
     post_text, _ = generate_engaging_post()
+    
     if not post_text:
-        print("❌ AI failed to generate a tweet. Skipping post.")
+        print("❌ Failed to generate a tweet after all retries. Skipping post.")
         return
 
-    print(f"Tweet:\n{post_text}\n")
+    print(f"\nGenerated Tweet ({len(post_text)} characters):")
+    print("-" * 40)
+    print(post_text)
+    print("-" * 40)
+    print()
 
+    # Optional: Ask for confirmation before posting
+    # user_input = input("Post this tweet? (y/N): ")
+    # if user_input.lower() != 'y':
+    #     print("Tweet not posted.")
+    #     return
+
+    print("Posting to Twitter...")
     success = post_to_twitter(
         post_text,
         TWITTER_API_KEY,
