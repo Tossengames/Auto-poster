@@ -51,7 +51,7 @@ CONTENT_TYPES = {
     "fan_philosopher": {
         "style": "like a regular fan chatting about football life",
         "focus": "what it's really like to support a team, rivalries, matchday feelings",
-        "hashtags": ["#FanLife", "#FootballCulture", "#Matchday", "#Soccer", "#Supporters"],
+        "hashtags": ["#FanLife", "#FootballCulture", "#Matchday"],
         "filter_keywords": ["fan", "support", "rivalry", "atmosphere", "passion", "feeling"],
         "fallback_priority": 1,
         "flexible": True
@@ -59,7 +59,7 @@ CONTENT_TYPES = {
     "tactical_nerd": {
         "style": "like a coach explaining things to friends at the pub",
         "focus": "formations, pressing, and subtle game changes",
-        "hashtags": ["#Tactics", "#FootballTalk", "#GameAnalysis", "#Soccer", "#Strategy"],
+        "hashtags": ["#Tactics", "#FootballTalk", "#GameAnalysis"],
         "filter_keywords": ["formation", "tactic", "press", "midfield", "defense", "system"],
         "fallback_priority": 2,
         "flexible": True
@@ -67,7 +67,7 @@ CONTENT_TYPES = {
     "data_driven": {
         "style": "like a stats fan who spots what others miss",
         "focus": "stats like xG, pass accuracy, and possession numbers",
-        "hashtags": ["#FootballStats", "#Analytics", "#Data", "#SoccerAnalysis", "#SportsData"],
+        "hashtags": ["#FootballStats", "#Analytics", "#Data"],
         "filter_keywords": ["stats", "data", "xg", "expected", "percentage", "metric"],
         "fallback_priority": 3,
         "flexible": True
@@ -75,7 +75,7 @@ CONTENT_TYPES = {
     "transfer_whisperer": {
         "style": "like someone who follows transfer gossip but keeps it real",
         "focus": "transfers, contracts, rumors - talk about the business side",
-        "hashtags": ["#TransferTalk", "#Rumors", "#SoccerNews", "#Football", "#MarketWatch"],
+        "hashtags": ["#TransferTalk", "#Rumors", "#SoccerNews"],
         "filter_keywords": ["transfer", "signing", "contract", "rumor", "agent", "deal"],
         "fallback_priority": 4,
         "flexible": True
@@ -83,7 +83,7 @@ CONTENT_TYPES = {
     "cultural_historian": {
         "style": "like an older fan sharing cool stories",
         "focus": "past games, legends, or historical moments",
-        "hashtags": ["#Throwback", "#FootballHistory", "#OldSchool", "#Soccer", "#Nostalgia"],
+        "hashtags": ["#Throwback", "#FootballHistory", "#OldSchool"],
         "filter_keywords": ["remember", "throwback", "199", "198", "classic", "legend"],
         "fallback_priority": 5,
         "flexible": False
@@ -93,16 +93,27 @@ CONTENT_TYPES = {
 FLEXIBLE_PERSONAS = [name for name, config in CONTENT_TYPES.items() if config.get("flexible", True)]
 
 # =============================
-# HASHTAG POOL
+# OPTIMIZED HASHTAG STRATEGY
 # =============================
-TOP_SOCCER_HASHTAGS = [
-    "#football", "#soccer", "#futbol", "#footballtalk", "#footballfan",
-    "#matchday", "#gameday", "#footballlife", "#soccerfan", "#footballculture",
-    "#premierleague", "#laliga", "#bundesliga", "#seriea", "#ucl",
-    "#championsleague", "#worldcup", "#euro", "#messi", "#ronaldo",
-    "#analysis", "#stats", "#tactics", "#history", "#throwback",
-    "#rumors", "#transfers", "#news", "#highlights", "#goals",
-    "#footballtwitter", "#soccertwitter", "#viral", "#fyp", "#footballcommunity"
+# Core strategy: 1 persona-specific + 1-2 general = 2-3 total hashtags
+
+PERSONA_HASHTAGS = {
+    "fan_philosopher": ["#FanLife", "#FootballCulture", "#Matchday"],
+    "tactical_nerd": ["#Tactics", "#GameAnalysis", "#FootballTalk"],
+    "data_driven": ["#FootballStats", "#Analytics", "#Data"],
+    "transfer_whisperer": ["#TransferTalk", "#Rumors", "#SoccerNews"],
+    "cultural_historian": ["#Throwback", "#FootballHistory", "#OldSchool"]
+}
+
+GENERAL_HASHTAGS = [
+    # High-value general tags (pick 1-2 from these)
+    "#football", "#soccer", "#futbol",
+    
+    # League/competition tags (contextual)
+    "#premierleague", "#laliga", "#bundesliga", "#ucl", "#championsleague",
+    
+    # High-engagement tags
+    "#footballtwitter", "#soccertwitter"
 ]
 
 # =============================
@@ -131,13 +142,22 @@ def clean_html(text):
     text = text.replace('&quot;', '"').replace('&#39;', "'")
     return text.strip()
 
-def get_hashtags_for_persona(persona_name, count=5):
-    persona_tags = CONTENT_TYPES[persona_name]["hashtags"]
-    other_tags = [tag for tag in TOP_SOCCER_HASHTAGS if tag not in persona_tags]
-    selected = random.sample(persona_tags, min(3, len(persona_tags)))
+def get_optimized_hashtags(persona_name, count=3):
+    """
+    Returns 2-3 optimized hashtags:
+    1. One persona-specific hashtag (core identity)
+    2. 1-2 general high-value hashtags
+    """
+    persona_hashtags = PERSONA_HASHTAGS.get(persona_name, ["#football"])
+    
+    # Pick 1 persona-specific hashtag
+    selected = [random.choice(persona_hashtags)]
+    
+    # Pick 1-2 general hashtags
     remaining = count - len(selected)
     if remaining > 0:
-        selected.extend(random.sample(other_tags, min(remaining, len(other_tags))))
+        selected.extend(random.sample(GENERAL_HASHTAGS, min(remaining, len(GENERAL_HASHTAGS))))
+    
     return ' '.join(selected)
 
 def filter_for_persona(entry, persona_name):
@@ -227,7 +247,6 @@ def generate_with_persona(persona_name, entries, attempt_adaptation=True):
     elif attempt_adaptation and persona.get("flexible", True):
         # 2. Second try: Adapt general content
         print(f"  ⚠️  No direct matches for {persona_name}, attempting adaptation...")
-        # FIXED LINE: Check if link is in posted_links, not the whole entry
         general_entries = [e for e in entries if e['link'] not in posted_links]
         if general_entries:
             entry = random.choice(general_entries)
@@ -252,7 +271,8 @@ def generate_with_persona(persona_name, entries, attempt_adaptation=True):
             
             text = clean_ai_text(text)
             if text and len(text) > 20:
-                hashtags = get_hashtags_for_persona(persona_name)
+                # OPTIMIZED: Now using 2-3 hashtags instead of 5-6
+                hashtags = get_optimized_hashtags(persona_name, count=random.randint(2, 3))
                 final_tweet = format_tweet(text, hashtags)
                 posted_links.add(entry['link'])
                 return final_tweet, persona_name
@@ -349,7 +369,8 @@ def generate_tweet():
             
             text = clean_ai_text(text)
             if text:
-                hashtags = get_hashtags_for_persona("fan_philosopher")
+                # Even general tweets get optimized hashtags
+                hashtags = get_optimized_hashtags("fan_philosopher", count=2)
                 tweet = format_tweet(text, hashtags)
                 print(f"  ✅ Created general fan tweet")
                 return tweet, "fan_philosopher"
@@ -364,7 +385,7 @@ def generate_tweet():
 # =============================
 def main():
     print("=" * 50)
-    print("⚽ Smart Soccer Bot - Adaptive Persona System")
+    print("⚽ Smart Soccer Bot - Optimized Hashtag Edition")
     print("=" * 50)
     
     # Check credentials
@@ -375,6 +396,7 @@ def main():
         return
     
     print("✓ All systems ready")
+    print(f"✓ Hashtag strategy: 2-3 optimized tags per tweet")
     print(f"✓ Persona flexibility: {len(FLEXIBLE_PERSONAS)} flexible, 1 specific")
     print(f"✓ Fallback system: 3-tier strategy")
     
@@ -390,6 +412,7 @@ def main():
     print(tweet)
     print("=" * 50)
     print(f"Length: {len(tweet)} chars")
+    print(f"Hashtags: {len(tweet.split('#') )-1} (optimized)")
     print("=" * 50)
     
     print("\n📤 Posting to Twitter...")
