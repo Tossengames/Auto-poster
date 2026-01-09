@@ -53,7 +53,7 @@ CONTENT_TYPES = {
         "focus": "what it's really like to support a team, rivalries, matchday feelings",
         "hashtags": ["#FanLife", "#FootballCulture", "#Matchday", "#Soccer", "#Supporters"],
         "filter_keywords": ["fan", "support", "rivalry", "atmosphere", "passion", "feeling"],
-        "fallback_priority": 1,  # HIGHEST - can talk about anything
+        "fallback_priority": 1,
         "flexible": True
     },
     "tactical_nerd": {
@@ -85,14 +85,12 @@ CONTENT_TYPES = {
         "focus": "past games, legends, or historical moments",
         "hashtags": ["#Throwback", "#FootballHistory", "#OldSchool", "#Soccer", "#Nostalgia"],
         "filter_keywords": ["remember", "throwback", "199", "198", "classic", "legend"],
-        "fallback_priority": 5,  # LOWEST - most specific
-        "flexible": False  # Not flexible - needs historical content
+        "fallback_priority": 5,
+        "flexible": False
     }
 }
 
-# Personas sorted by flexibility (most flexible first)
 FLEXIBLE_PERSONAS = [name for name, config in CONTENT_TYPES.items() if config.get("flexible", True)]
-SPECIFIC_PERSONAS = [name for name, config in CONTENT_TYPES.items() if not config.get("flexible", True)]
 
 # =============================
 # HASHTAG POOL
@@ -161,21 +159,14 @@ def filter_for_persona(entry, persona_name):
     return True
 
 def adapt_content_to_persona(entry, persona_name):
-    """Try to adapt any content to fit the persona's perspective"""
     title = entry['title']
-    summary = entry['summary']
     
     adaptation_prompts = {
-        "fan_philosopher": f"Take this football topic and turn it into a fan's perspective: '{title}'. Talk about how fans feel about it.",
-        "tactical_nerd": f"Find a tactical angle in this: '{title}'. How would a tactics enthusiast view this situation?",
-        "data_driven": f"Look for statistical or data angles in: '{title}'. What numbers or metrics come to mind?",
-        "transfer_whisperer": f"Find transfer/business angles in: '{title}'. Could this affect transfers or contracts?",
-        "cultural_historian": f"ONLY if this has historical elements. Otherwise skip. Topic: '{title}'"
+        "fan_philosopher": f"Take this football topic and turn it into a fan's perspective: '{title}'. Talk about how fans feel about it. Write a short 2-line tweet using natural, casual language.",
+        "tactical_nerd": f"Find a tactical angle in this: '{title}'. How would a tactics enthusiast view this situation? Write a short 2-line tweet using natural language.",
+        "data_driven": f"Look for statistical or data angles in: '{title}'. What numbers or metrics come to mind? Write a short 2-line tweet using natural language.",
+        "transfer_whisperer": f"Find transfer/business angles in: '{title}'. Could this affect transfers or contracts? Write a short 2-line tweet using natural language.",
     }
-    
-    if persona_name == "cultural_historian":
-        # Cultural historian can't adapt non-historical content
-        return None
     
     return adaptation_prompts.get(persona_name)
 
@@ -224,7 +215,6 @@ def parse_reddit_rss():
 # CONTENT GENERATION WITH FALLBACK SYSTEM
 # =============================
 def generate_with_persona(persona_name, entries, attempt_adaptation=True):
-    """Try to generate content for a specific persona"""
     persona = CONTENT_TYPES[persona_name]
     
     # 1. First try: Find matching content
@@ -233,16 +223,17 @@ def generate_with_persona(persona_name, entries, attempt_adaptation=True):
     if matching_entries:
         print(f"  ✓ Found {len(matching_entries)} matching entries for {persona_name}")
         entry = random.choice(matching_entries)
-        prompt = f"Write a short 2-line tweet as a {persona['style']} about: '{entry['title']}'. {entry['summary']}. Use natural language, no AI words."
+        prompt = f"Write a short 2-line tweet as a {persona['style']} about: '{entry['title']}'. Use natural, casual language like a real person. No AI-sounding words."
     elif attempt_adaptation and persona.get("flexible", True):
         # 2. Second try: Adapt general content
         print(f"  ⚠️  No direct matches for {persona_name}, attempting adaptation...")
-        general_entries = [e for e in entries if e not in posted_links]
+        # FIXED LINE: Check if link is in posted_links, not the whole entry
+        general_entries = [e for e in entries if e['link'] not in posted_links]
         if general_entries:
             entry = random.choice(general_entries)
             adaptation = adapt_content_to_persona(entry, persona_name)
             if adaptation:
-                prompt = f"{adaptation} Write a short 2-line tweet using natural, human language."
+                prompt = adaptation
             else:
                 return None, None
         else:
@@ -384,7 +375,7 @@ def main():
         return
     
     print("✓ All systems ready")
-    print(f"✓ Persona flexibility: {len(FLEXIBLE_PERSONAS)} flexible, {len(SPECIFIC_PERSONAS)} specific")
+    print(f"✓ Persona flexibility: {len(FLEXIBLE_PERSONAS)} flexible, 1 specific")
     print(f"✓ Fallback system: 3-tier strategy")
     
     tweet, persona = generate_tweet()
