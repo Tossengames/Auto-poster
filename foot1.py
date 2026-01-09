@@ -53,46 +53,55 @@ posted_links = set()
 
 CONTENT_TYPES = {
     "data_driven": {
-        "style": "analytical and stats-focused",
-        "focus": "expected goals (xG), pass completion, defensive stats, possession metrics, and what the numbers truly reveal about the game",
-        "hashtags": ["#FootballAnalytics", "#SoccerStats", "#Data", "#xG", "#SportsScience"]
+        "style": "like a stats fan who spots what others miss",
+        "focus": "stats like xG, pass accuracy, and possession numbers - keep it simple, point out what the numbers actually mean",
+        "hashtags": ["#FootballStats", "#Analytics", "#Data", "#SoccerAnalysis", "#SportsData"]
     },
     "tactical_nerd": {
-        "style": "technical and educational",
-        "focus": "formations, pressing traps, midfield structures, tactical fouls, manager philosophies, and subtle in-game adjustments",
-        "hashtags": ["#FootballTactics", "#TacticalAnalysis", "#Soccer", "#Coach", "#GamePlan"]
+        "style": "like a coach explaining things to friends at the pub",
+        "focus": "formations, pressing, and subtle game changes - explain it like you're talking to someone, not writing a textbook",
+        "hashtags": ["#Tactics", "#FootballTalk", "#GameAnalysis", "#Soccer", "#Strategy"]
     },
     "transfer_whisperer": {
-        "style": "speculative and market-savvy",
-        "focus": "transfer rumors, contract details, agent activity, club finances, youth prospects, and the business behind the sport",
-        "hashtags": ["#TransferNews", "#DeadlineDay", "#SoccerTransfers", "#Football", "#Rumors"]
+        "style": "like someone who follows transfer gossip but keeps it real",
+        "focus": "transfers, contracts, rumors - talk about the business side like it's football gossip with friends",
+        "hashtags": ["#TransferTalk", "#Rumors", "#SoccerNews", "#Football", "#MarketWatch"]
     },
     "cultural_historian": {
-        "style": "nostalgic and story-driven",
-        "focus": "iconic moments, legendary players, historic kits, forgotten teams, stadium lore, and the cultural impact of soccer",
-        "hashtags": ["#FootballHistory", "#ClassicFootball", "#SoccerLegends", "#Nostalgia", "#Throwback"]
+        "style": "like an older fan sharing cool stories",
+        "focus": "old moments, legendary players, iconic games - tell stories like you're reminiscing, not giving a history lesson",
+        "hashtags": ["#Throwback", "#FootballHistory", "#OldSchool", "#Soccer", "#Nostalgia"]
     },
     "fan_philosopher": {
-        "style": "observational and witty",
-        "focus": "fan behavior, the agony and ecstasy of support, rivalries, superstitions, and the universal truths of being a football fan",
-        "hashtags": ["#FanCulture", "#FootballLife", "#Soccer", "#LoveFootball", "#GameDay"]
+        "style": "like a regular fan chatting about football life",
+        "focus": "what it's really like to support a team, rivalries, matchday feelings - keep it real and relatable",
+        "hashtags": ["#FanLife", "#FootballCulture", "#Matchday", "#Soccer", "#Supporters"]
     }
 }
 
 # =============================
 # CURATED HIGH-PERFORMING HASHTAG POOL
-# Based on popular soccer/sports hashtag research
+# Natural, conversational hashtags that real people use
 # =============================
 
 TOP_SOCCER_HASHTAGS = [
-    # High-Reach General Soccer Hashtags
-    "#soccer", "#football", "#futbol", "#sports", "#fifa",
-    # Top Player & League Hashtags
-    "#messi", "#ronaldo", "#premierleague", "#laliga", "#bundesliga", "#seriea", "#ucl",
-    # Engaging & Community Hashtags
-    "#goals", "#championsleague", "#worldcup", "#transfer", "#skills", "#training", "#matchday",
-    # Platform & Viral Hashtags
-    "#viral", "#fyp", "#soccertiktok", "#footballtwitter"
+    # Natural, conversational hashtags
+    "#football", "#soccer", "#futbol", "#footballtalk", "#footballfan",
+    "#matchday", "#gameday", "#footballlife", "#soccerfan", "#footballculture",
+    
+    # League and team hashtags (natural usage)
+    "#premierleague", "#laliga", "#bundesliga", "#seriea", "#ucl",
+    "#championsleague", "#worldcup", "#euro",
+    
+    # Player hashtags (only top players people actually tag)
+    "#messi", "#ronaldo", "#mbappe", "#haaland",
+    
+    # Content type hashtags
+    "#analysis", "#stats", "#tactics", "#history", "#throwback",
+    "#rumors", "#transfers", "#news", "#highlights", "#goals",
+    
+    # Engagement and community
+    "#footballtwitter", "#soccertwitter", "#viral", "#fyp", "#footballcommunity"
 ]
 
 # =============================
@@ -138,8 +147,8 @@ def clean_html(text):
     return text.strip()
 
 def get_random_hashtags():
-    """Selects 3-4 random hashtags from the curated pool."""
-    num_to_pick = random.randint(3, 4)
+    """Selects 5-6 random hashtags from the curated pool."""
+    num_to_pick = random.randint(5, 6)
     selected = random.sample(TOP_SOCCER_HASHTAGS, num_to_pick)
     return ' '.join(selected)
 
@@ -192,7 +201,7 @@ def parse_reddit_rss(max_retries=3):
                     entries.append({
                         'title': title,
                         'link': link,
-                        'summary': summary[:500] if summary else ''
+                        'summary': summary[:300] if summary else ''  # Shorter summary for shorter tweets
                     })
                 
                 success = True
@@ -241,7 +250,6 @@ def generate_engaging_post(max_rss_retries=3, max_entry_tries=5):
     selected_type = CONTENT_TYPES[selected_type_name]
     print(f"\n🎭 Selected Content Personality: {selected_type_name.replace('_', ' ').title()}")
     print(f"   Style: {selected_type['style']}")
-    print(f"   Focus: {selected_type['focus'][:80]}...")
     
     attempted_entries = []
     for attempt in range(min(max_entry_tries, len(entries))):
@@ -258,22 +266,26 @@ def generate_engaging_post(max_rss_retries=3, max_entry_tries=5):
         
         posted_links.add(entry['link'])
 
-        # DYNAMIC PROMPT BASED ON RANDOMLY SELECTED STYLE
+        # NATURAL LANGUAGE PROMPT - SHORT AND HUMAN-LIKE
         prompt = (
-            f"Create ONE standalone, engaging tweet about soccer, inspired by this discussion:\n\n"
+            f"Write a short, natural soccer tweet (2 lines max) based on this:\n\n"
             f"Title: {entry['title']}\n"
             f"Summary: {entry['summary']}\n\n"
-            f"IMPORTANT - ADOPT THIS SPECIFIC PERSONA:\n"
-            f"You are a {selected_type['style']} commentator. Your focus is on {selected_type['focus']}.\n\n"
-            f"Tweet Requirements:\n"
-            f"- Write from a third-person or neutral observer perspective\n"
-            f"- DO NOT use first-person words (I, me, my, we, our, us)\n"
-            f"- Be insightful, witty, or intriguing based on your persona\n"
-            f"- Use 1-2 relevant emojis for tone\n"
-            f"- Must make sense by itself without needing the source\n"
-            f"- Max 250 characters for the tweet text\n"
-            f"- Do NOT mention Reddit, 'subreddit', or 'OP'\n\n"
-            f"Generate ONLY the tweet text. Do not add explanations.\n"
+            f"WRITE LIKE A REAL PERSON CHATTING:\n"
+            f"- Sound like {selected_type['style']}\n"
+            f"- Keep it to 2 lines maximum\n"
+            f"- Use normal, everyday language\n"
+            f"- NO AI-sounding words like 'behold', 'thus', 'indeed'\n"
+            f"- NO first-person (I, me, my, we, our, us)\n"
+            f"- Use casual emojis if they fit naturally 😅👍⚽\n"
+            f"- Make it something a real fan would actually say\n"
+            f"- Under 200 characters for the message part\n"
+            f"- DON'T mention Reddit or where it came from\n\n"
+            f"Examples of natural style:\n"
+            f"'That defending was something else. Just completely fell apart at the back.'\n"
+            f"'Stats say they dominated possession. Funny how it never felt that way watching.'\n"
+            f"'Remember that game? Still gives me goosebumps thinking about it.'\n\n"
+            f"Just write the tweet text, nothing else."
         )
 
         try:
@@ -295,18 +307,46 @@ def generate_engaging_post(max_rss_retries=3, max_entry_tries=5):
                     time.sleep(1)
                 continue
 
-            # Clean and format the generated text
+            # Clean up the text to sound more natural
             text = re.sub(r'\*\*|\*|__|_', '', text).strip()
+            
+            # Remove any remaining AI-sounding phrases
+            ai_phrases = [
+                r'\b(behold|thus|indeed|henceforth|hereby|wherein)\b',
+                r'\b(as an ai|as a language model|as an artificial)\b',
+                r'\b(in summary|in conclusion|to summarize)\b',
+                r'\b(dear reader|valued audience|esteemed followers)\b'
+            ]
+            for phrase in ai_phrases:
+                text = re.sub(phrase, '', text, flags=re.IGNORECASE)
+            
             text = re.sub(r'\b(reddit|subreddit|r/\w+)\b', '', text, flags=re.IGNORECASE)
             text = re.sub(r'\b(I|me|my|we|our|us)\b', '', text, flags=re.IGNORECASE)
-            text = re.sub(r'\n\s*\n+', '\n\n', text)
             
-            # ADD RANDOMIZED HASHTAGS
+            # Clean up extra spaces and newlines
+            text = re.sub(r'\s+', ' ', text)
+            text = re.sub(r'\n\s*\n+', '\n', text)
+            
+            # Ensure it's exactly 1-2 lines
+            lines = [line.strip() for line in text.split('\n') if line.strip()]
+            if len(lines) > 2:
+                text = '\n'.join(lines[:2])
+            elif len(lines) == 1 and len(text) > 100:
+                # If one line is too long, split it naturally
+                words = text.split()
+                if len(words) > 15:
+                    mid = len(words) // 2
+                    text = ' '.join(words[:mid]) + '\n' + ' '.join(words[mid:])
+            
+            # ADD RANDOMIZED HASHTAGS (5-6 now)
             dynamic_hashtags = get_random_hashtags()
             final_tweet = text + "\n\n" + dynamic_hashtags
 
             if len(final_tweet) > 280:
-                final_tweet = final_tweet[:274] + "..."
+                # Trim the text part, not the hashtags
+                text_max_len = 280 - len(dynamic_hashtags) - 3  # -3 for newlines
+                text = text[:text_max_len].rsplit(' ', 1)[0]  # Don't cut words
+                final_tweet = text + "\n\n" + dynamic_hashtags
 
             print(f"✓ Successfully generated tweet ({len(final_tweet)} chars)")
             print(f"   Hashtags: {dynamic_hashtags}")
@@ -327,7 +367,7 @@ def generate_engaging_post(max_rss_retries=3, max_entry_tries=5):
 
 def main():
     print("=" * 50)
-    print("⚽ Soccer Content Bot - Multi-Style Edition")
+    print("⚽ Soccer Content Bot - Natural Human Edition")
     print("=" * 50)
 
     # Check credentials
@@ -348,7 +388,10 @@ def main():
 
     print("✓ All credentials present")
     print(f"✓ Using {len(REDDIT_RSS_FEEDS)} soccer RSS feeds")
-    print(f"✓ Hashtag pool: {len(TOP_SOCCER_HASHTAGS)} curated tags")
+    print(f"✓ Hashtag pool: {len(TOP_SOCCER_HASHTAGS)} natural tags")
+    print("✓ Writing style: Natural human conversation")
+    print("✓ Tweet length: 2 lines maximum")
+    print("✓ Hashtags: 5-6 per tweet")
     print("\n🚀 Starting content generation...")
 
     post_text, _ = generate_engaging_post()
