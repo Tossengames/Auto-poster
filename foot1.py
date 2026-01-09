@@ -36,12 +36,12 @@ REDDIT_RSS_FEEDS = [
     "https://www.reddit.com/r/soccer/.rss",
     "https://www.reddit.com/r/football/.rss",
     "https://www.reddit.com/r/PremierLeague/.rss",
-    "https://www.reddit.com r/footballtactics .rss",
+    "https://www.reddit.com/r/footballtactics/.rss",
     "https://www.reddit.com/r/Bundesliga/.rss",
     "https://www.reddit.com/r/LaLiga/.rss",
     "https://www.reddit.com/r/classicsoccer/.rss",
     "https://www.reddit.com/r/footballmemes/.rss",
-    "https://www.reddit.com r/soccercirclejerk .rss", # For satirical takes
+    "https://www.reddit.com/r/soccercirclejerk/.rss",
     "https://www.reddit.com/r/MLS/.rss",
 ]
 
@@ -70,7 +70,7 @@ CONTENT_TYPES = {
     "cultural_historian": {
         "style": "nostalgic and story-driven",
         "focus": "iconic moments, legendary players, historic kits, forgotten teams, stadium lore, and the cultural impact of soccer",
-        "hashtags": ["#FootballHistory", #ClassicFootball", "#SoccerLegends", "#Nostalgia", "#Throwback"]
+        "hashtags": ["#FootballHistory", "#ClassicFootball", "#SoccerLegends", "#Nostalgia", "#Throwback"]
     },
     "fan_philosopher": {
         "style": "observational and witty",
@@ -81,17 +81,17 @@ CONTENT_TYPES = {
 
 # =============================
 # CURATED HIGH-PERFORMING HASHTAG POOL
-# Based on popular soccer/sports hashtag research[citation:1][citation:2][citation:10]
+# Based on popular soccer/sports hashtag research
 # =============================
 
 TOP_SOCCER_HASHTAGS = [
-    # High-Reach General Soccer Hashtags[citation:2][citation:10]
+    # High-Reach General Soccer Hashtags
     "#soccer", "#football", "#futbol", "#sports", "#fifa",
-    # Top Player & League Hashtags[citation:2][citation:5]
+    # Top Player & League Hashtags
     "#messi", "#ronaldo", "#premierleague", "#laliga", "#bundesliga", "#seriea", "#ucl",
-    # Engaging & Community Hashtags[citation:1][citation:9]
+    # Engaging & Community Hashtags
     "#goals", "#championsleague", "#worldcup", "#transfer", "#skills", "#training", "#matchday",
-    # Platform & Viral Hashtags[citation:2][citation:10]
+    # Platform & Viral Hashtags
     "#viral", "#fyp", "#soccertiktok", "#footballtwitter"
 ]
 
@@ -306,7 +306,7 @@ def generate_engaging_post(max_rss_retries=3, max_entry_tries=5):
             final_tweet = text + "\n\n" + dynamic_hashtags
 
             if len(final_tweet) > 280:
-                final_tweet = final_tweet[:274] + "..."  # Reserve space for hashtags
+                final_tweet = final_tweet[:274] + "..."
 
             print(f"✓ Successfully generated tweet ({len(final_tweet)} chars)")
             print(f"   Hashtags: {dynamic_hashtags}")
