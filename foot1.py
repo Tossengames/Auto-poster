@@ -14,7 +14,6 @@ from google import genai
 # =============================
 # CONFIGURATION
 # =============================
-
 TWITTER_API_KEY = os.getenv("TWITTER_API_KEY")
 TWITTER_API_SECRET = os.getenv("TWITTER_API_SECRET")
 TWITTER_ACCESS_TOKEN = os.getenv("TWITTER_ACCESS_TOKEN")
@@ -24,14 +23,12 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 # =============================
 # INITIALIZE GEMINI
 # =============================
-
 client = genai.Client(api_key=GEMINI_API_KEY)
 MODEL_NAME = "gemini-2.5-flash-lite"
 
 # =============================
 # EXPANDED REDDIT RSS FEEDS FOR SOCCER
 # =============================
-
 REDDIT_RSS_FEEDS = [
     "https://www.reddit.com/r/soccer/.rss",
     "https://www.reddit.com/r/football/.rss",
@@ -48,379 +45,367 @@ REDDIT_RSS_FEEDS = [
 posted_links = set()
 
 # =============================
-# RANDOM CONTENT TYPE PERSONALITIES
+# PERSONA CONFIGURATION WITH FALLBACK PRIORITY
 # =============================
-
 CONTENT_TYPES = {
-    "data_driven": {
-        "style": "like a stats fan who spots what others miss",
-        "focus": "stats like xG, pass accuracy, and possession numbers - keep it simple, point out what the numbers actually mean",
-        "hashtags": ["#FootballStats", "#Analytics", "#Data", "#SoccerAnalysis", "#SportsData"]
+    "fan_philosopher": {
+        "style": "like a regular fan chatting about football life",
+        "focus": "what it's really like to support a team, rivalries, matchday feelings",
+        "hashtags": ["#FanLife", "#FootballCulture", "#Matchday", "#Soccer", "#Supporters"],
+        "filter_keywords": ["fan", "support", "rivalry", "atmosphere", "passion", "feeling"],
+        "fallback_priority": 1,  # HIGHEST - can talk about anything
+        "flexible": True
     },
     "tactical_nerd": {
         "style": "like a coach explaining things to friends at the pub",
-        "focus": "formations, pressing, and subtle game changes - explain it like you're talking to someone, not writing a textbook",
-        "hashtags": ["#Tactics", "#FootballTalk", "#GameAnalysis", "#Soccer", "#Strategy"]
+        "focus": "formations, pressing, and subtle game changes",
+        "hashtags": ["#Tactics", "#FootballTalk", "#GameAnalysis", "#Soccer", "#Strategy"],
+        "filter_keywords": ["formation", "tactic", "press", "midfield", "defense", "system"],
+        "fallback_priority": 2,
+        "flexible": True
+    },
+    "data_driven": {
+        "style": "like a stats fan who spots what others miss",
+        "focus": "stats like xG, pass accuracy, and possession numbers",
+        "hashtags": ["#FootballStats", "#Analytics", "#Data", "#SoccerAnalysis", "#SportsData"],
+        "filter_keywords": ["stats", "data", "xg", "expected", "percentage", "metric"],
+        "fallback_priority": 3,
+        "flexible": True
     },
     "transfer_whisperer": {
         "style": "like someone who follows transfer gossip but keeps it real",
-        "focus": "transfers, contracts, rumors - talk about the business side like it's football gossip with friends",
-        "hashtags": ["#TransferTalk", "#Rumors", "#SoccerNews", "#Football", "#MarketWatch"]
+        "focus": "transfers, contracts, rumors - talk about the business side",
+        "hashtags": ["#TransferTalk", "#Rumors", "#SoccerNews", "#Football", "#MarketWatch"],
+        "filter_keywords": ["transfer", "signing", "contract", "rumor", "agent", "deal"],
+        "fallback_priority": 4,
+        "flexible": True
     },
     "cultural_historian": {
         "style": "like an older fan sharing cool stories",
-        "focus": "old moments, legendary players, iconic games - tell stories like you're reminiscing, not giving a history lesson",
-        "hashtags": ["#Throwback", "#FootballHistory", "#OldSchool", "#Soccer", "#Nostalgia"]
-    },
-    "fan_philosopher": {
-        "style": "like a regular fan chatting about football life",
-        "focus": "what it's really like to support a team, rivalries, matchday feelings - keep it real and relatable",
-        "hashtags": ["#FanLife", "#FootballCulture", "#Matchday", "#Soccer", "#Supporters"]
+        "focus": "past games, legends, or historical moments",
+        "hashtags": ["#Throwback", "#FootballHistory", "#OldSchool", "#Soccer", "#Nostalgia"],
+        "filter_keywords": ["remember", "throwback", "199", "198", "classic", "legend"],
+        "fallback_priority": 5,  # LOWEST - most specific
+        "flexible": False  # Not flexible - needs historical content
     }
 }
 
-# =============================
-# CURATED HIGH-PERFORMING HASHTAG POOL
-# Natural, conversational hashtags that real people use
-# =============================
+# Personas sorted by flexibility (most flexible first)
+FLEXIBLE_PERSONAS = [name for name, config in CONTENT_TYPES.items() if config.get("flexible", True)]
+SPECIFIC_PERSONAS = [name for name, config in CONTENT_TYPES.items() if not config.get("flexible", True)]
 
+# =============================
+# HASHTAG POOL
+# =============================
 TOP_SOCCER_HASHTAGS = [
-    # Natural, conversational hashtags
     "#football", "#soccer", "#futbol", "#footballtalk", "#footballfan",
     "#matchday", "#gameday", "#footballlife", "#soccerfan", "#footballculture",
-    
-    # League and team hashtags (natural usage)
     "#premierleague", "#laliga", "#bundesliga", "#seriea", "#ucl",
-    "#championsleague", "#worldcup", "#euro",
-    
-    # Player hashtags (only top players people actually tag)
-    "#messi", "#ronaldo", "#mbappe", "#haaland",
-    
-    # Content type hashtags
+    "#championsleague", "#worldcup", "#euro", "#messi", "#ronaldo",
     "#analysis", "#stats", "#tactics", "#history", "#throwback",
     "#rumors", "#transfers", "#news", "#highlights", "#goals",
-    
-    # Engagement and community
     "#footballtwitter", "#soccertwitter", "#viral", "#fyp", "#footballcommunity"
 ]
 
 # =============================
-# TWITTER API FUNCTION
+# HELPER FUNCTIONS
 # =============================
-
-def post_to_twitter(content, api_key, api_secret, access_token, access_token_secret):
+def post_to_twitter(content):
     try:
         if len(content) > 280:
             content = content[:277] + "..."
-
         client_v2 = tweepy.Client(
-            consumer_key=api_key,
-            consumer_secret=api_secret,
-            access_token=access_token,
-            access_token_secret=access_token_secret
+            consumer_key=TWITTER_API_KEY,
+            consumer_secret=TWITTER_API_SECRET,
+            access_token=TWITTER_ACCESS_TOKEN,
+            access_token_secret=TWITTER_ACCESS_TOKEN_SECRET
         )
-
         response = client_v2.create_tweet(text=content)
         return bool(response and response.data)
     except Exception as e:
         print(f"Twitter post error: {e}")
         return False
 
-# =============================
-# HELPER FUNCTIONS
-# =============================
-
-def contains_political_content(text):
-    POLITICAL_KEYWORDS = [
-        'trump','biden','president','election','government','policy',
-        'tax','war','democrat','republican','vote','congress','senate'
-    ]
-    return any(k in text.lower() for k in POLITICAL_KEYWORDS) if text else False
-
 def clean_html(text):
-    """Remove HTML tags from text"""
-    if not text:
-        return ""
+    if not text: return ""
     text = re.sub(r'<[^>]+>', '', text)
     text = text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
     text = text.replace('&quot;', '"').replace('&#39;', "'")
     return text.strip()
 
-def get_random_hashtags():
-    """Selects 5-6 random hashtags from the curated pool."""
-    num_to_pick = random.randint(5, 6)
-    selected = random.sample(TOP_SOCCER_HASHTAGS, num_to_pick)
+def get_hashtags_for_persona(persona_name, count=5):
+    persona_tags = CONTENT_TYPES[persona_name]["hashtags"]
+    other_tags = [tag for tag in TOP_SOCCER_HASHTAGS if tag not in persona_tags]
+    selected = random.sample(persona_tags, min(3, len(persona_tags)))
+    remaining = count - len(selected)
+    if remaining > 0:
+        selected.extend(random.sample(other_tags, min(remaining, len(other_tags))))
     return ' '.join(selected)
 
-# =============================
-# PARSE REDDIT RSS WITH RETRY
-# =============================
-
-def parse_reddit_rss(max_retries=3):
-    entries = []
+def filter_for_persona(entry, persona_name):
+    title = entry['title'].lower()
+    summary = entry['summary'].lower()
+    persona = CONTENT_TYPES[persona_name]
+    keywords = persona.get("filter_keywords", [])
     
-    custom_headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    if persona_name == "cultural_historian":
+        if any(keyword in title or keyword in summary for keyword in keywords):
+            return True
+        year_pattern = r'\b(19\d{2}|200\d|201[0-7])\b'
+        if re.search(year_pattern, title) or re.search(year_pattern, summary):
+            return True
+        return False
+    
+    if keywords:
+        return any(keyword in title or keyword in summary for keyword in keywords)
+    return True
+
+def adapt_content_to_persona(entry, persona_name):
+    """Try to adapt any content to fit the persona's perspective"""
+    title = entry['title']
+    summary = entry['summary']
+    
+    adaptation_prompts = {
+        "fan_philosopher": f"Take this football topic and turn it into a fan's perspective: '{title}'. Talk about how fans feel about it.",
+        "tactical_nerd": f"Find a tactical angle in this: '{title}'. How would a tactics enthusiast view this situation?",
+        "data_driven": f"Look for statistical or data angles in: '{title}'. What numbers or metrics come to mind?",
+        "transfer_whisperer": f"Find transfer/business angles in: '{title}'. Could this affect transfers or contracts?",
+        "cultural_historian": f"ONLY if this has historical elements. Otherwise skip. Topic: '{title}'"
     }
     
+    if persona_name == "cultural_historian":
+        # Cultural historian can't adapt non-historical content
+        return None
+    
+    return adaptation_prompts.get(persona_name)
+
+# =============================
+# RSS PARSING
+# =============================
+def parse_reddit_rss():
+    entries = []
+    custom_headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     feedparser.USER_AGENT = custom_headers['User-Agent']
-    shuffled_feeds = random.sample(REDDIT_RSS_FEEDS, len(REDDIT_RSS_FEEDS))
     
-    for url in shuffled_feeds:
-        success = False
-        for retry in range(max_retries):
-            try:
-                print(f"  Trying feed: {url.split('/')[4]}...")
-                response = requests.get(url, headers=custom_headers, timeout=15)
-                response.raise_for_status()
-                feed = feedparser.parse(response.content)
+    for url in random.sample(REDDIT_RSS_FEEDS, min(5, len(REDDIT_RSS_FEEDS))):
+        try:
+            response = requests.get(url, headers=custom_headers, timeout=10)
+            feed = feedparser.parse(response.content)
+            
+            for entry in feed.entries[:10]:
+                if not hasattr(entry, 'link') or entry.link in posted_links:
+                    continue
                 
-                if not feed.entries:
-                    print(f"    No entries found")
+                title = clean_html(getattr(entry, 'title', ''))
+                summary = clean_html(getattr(entry, 'summary', ''))
+                
+                if len(title) < 15:
+                    continue
+                
+                entries.append({
+                    'title': title,
+                    'link': entry.link,
+                    'summary': summary[:200] if summary else ''
+                })
+                
+                if len(entries) >= 15:
                     break
-                
-                print(f"    Found {len(feed.entries)} entries")
-                
-                for entry in feed.entries[:15]:
-                    if not hasattr(entry, 'link') or not entry.link:
-                        continue
                     
-                    link = entry.link
-                    if link in posted_links:
-                        continue
-                    
-                    title = clean_html(getattr(entry, 'title', 'No title'))
-                    summary = clean_html(getattr(entry, 'summary', ''))
-                    
-                    if len(title) < 10 or title == 'No title':
-                        continue
-                    
-                    if contains_political_content(title) or contains_political_content(summary):
-                        continue
-                    
-                    entries.append({
-                        'title': title,
-                        'link': link,
-                        'summary': summary[:300] if summary else ''  # Shorter summary for shorter tweets
-                    })
-                
-                success = True
+            if len(entries) >= 15:
                 break
                 
-            except requests.exceptions.RequestException as e:
-                print(f"    Request error (attempt {retry + 1}/{max_retries}): {e}")
-                if retry < max_retries - 1:
-                    time.sleep(2)
-                continue
-            except Exception as e:
-                print(f"    Parsing error: {e}")
-                break
-        
-        if len(entries) >= 20:
-            print(f"  Collected {len(entries)} entries, moving to generation")
-            break
+        except Exception as e:
+            print(f"  Feed error: {e}")
+            continue
     
-    print(f"Total entries collected: {len(entries)}")
     return entries
 
 # =============================
-# GENERATE TWEET WITH RANDOM STYLE
+# CONTENT GENERATION WITH FALLBACK SYSTEM
 # =============================
-
-def generate_engaging_post(max_rss_retries=3, max_entry_tries=5):
-    entries = []
+def generate_with_persona(persona_name, entries, attempt_adaptation=True):
+    """Try to generate content for a specific persona"""
+    persona = CONTENT_TYPES[persona_name]
     
-    for retry in range(max_rss_retries):
-        print(f"\nRSS Fetch Attempt {retry + 1}/{max_rss_retries}")
-        entries = parse_reddit_rss(max_retries=2)
-        
-        if entries:
-            print(f"✓ Successfully collected {len(entries)} entries")
-            break
-        elif retry < max_rss_retries - 1:
-            print(f"✗ No entries found, waiting 3 seconds before retry...")
-            time.sleep(3)
+    # 1. First try: Find matching content
+    matching_entries = [e for e in entries if filter_for_persona(e, persona_name)]
     
-    if not entries:
-        print("\n❌ No valid RSS entries found after all retries.")
+    if matching_entries:
+        print(f"  ✓ Found {len(matching_entries)} matching entries for {persona_name}")
+        entry = random.choice(matching_entries)
+        prompt = f"Write a short 2-line tweet as a {persona['style']} about: '{entry['title']}'. {entry['summary']}. Use natural language, no AI words."
+    elif attempt_adaptation and persona.get("flexible", True):
+        # 2. Second try: Adapt general content
+        print(f"  ⚠️  No direct matches for {persona_name}, attempting adaptation...")
+        general_entries = [e for e in entries if e not in posted_links]
+        if general_entries:
+            entry = random.choice(general_entries)
+            adaptation = adapt_content_to_persona(entry, persona_name)
+            if adaptation:
+                prompt = f"{adaptation} Write a short 2-line tweet using natural, human language."
+            else:
+                return None, None
+        else:
+            return None, None
+    else:
+        # 3. This persona can't work with available content
         return None, None
     
-    # RANDOMLY SELECT A CONTENT PERSONALITY
-    selected_type_name = random.choice(list(CONTENT_TYPES.keys()))
-    selected_type = CONTENT_TYPES[selected_type_name]
-    print(f"\n🎭 Selected Content Personality: {selected_type_name.replace('_', ' ').title()}")
-    print(f"   Style: {selected_type['style']}")
-    
-    attempted_entries = []
-    for attempt in range(min(max_entry_tries, len(entries))):
-        available_entries = [e for e in entries if e['link'] not in attempted_entries]
-        if not available_entries:
-            break
-            
-        entry = random.choice(available_entries)
-        attempted_entries.append(entry['link'])
-        
-        print(f"\n📝 Generation Attempt {attempt + 1}/{min(max_entry_tries, len(entries))}")
-        print(f"   Source: {entry['link'].split('/')[4] if len(entry['link'].split('/')) > 4 else 'reddit'}")
-        print(f"   Title: {entry['title'][:80]}...")
-        
-        posted_links.add(entry['link'])
-
-        # NATURAL LANGUAGE PROMPT - SHORT AND HUMAN-LIKE
-        prompt = (
-            f"Write a short, natural soccer tweet (2 lines max) based on this:\n\n"
-            f"Title: {entry['title']}\n"
-            f"Summary: {entry['summary']}\n\n"
-            f"WRITE LIKE A REAL PERSON CHATTING:\n"
-            f"- Sound like {selected_type['style']}\n"
-            f"- Keep it to 2 lines maximum\n"
-            f"- Use normal, everyday language\n"
-            f"- NO AI-sounding words like 'behold', 'thus', 'indeed'\n"
-            f"- NO first-person (I, me, my, we, our, us)\n"
-            f"- Use casual emojis if they fit naturally 😅👍⚽\n"
-            f"- Make it something a real fan would actually say\n"
-            f"- Under 200 characters for the message part\n"
-            f"- DON'T mention Reddit or where it came from\n\n"
-            f"Examples of natural style:\n"
-            f"'That defending was something else. Just completely fell apart at the back.'\n"
-            f"'Stats say they dominated possession. Funny how it never felt that way watching.'\n"
-            f"'Remember that game? Still gives me goosebumps thinking about it.'\n\n"
-            f"Just write the tweet text, nothing else."
-        )
-
-        try:
-            response = client.models.generate_content(
-                model=MODEL_NAME,
-                contents=prompt
-            )
-
+    try:
+        response = client.models.generate_content(model=MODEL_NAME, contents=prompt)
+        if response and response.candidates:
             text = ""
-            if response and response.candidates:
-                for part in response.candidates[0].content.parts:
-                    if hasattr(part, "text") and part.text:
-                        text += part.text
-
-            text = text.strip()
-            if not text:
-                print(f"✗ Gemini returned empty content")
-                if attempt < min(max_entry_tries - 1, len(entries) - 1):
-                    time.sleep(1)
-                continue
-
-            # Clean up the text to sound more natural
-            text = re.sub(r'\*\*|\*|__|_', '', text).strip()
+            for part in response.candidates[0].content.parts:
+                if hasattr(part, "text") and part.text:
+                    text += part.text
             
-            # Remove any remaining AI-sounding phrases
-            ai_phrases = [
-                r'\b(behold|thus|indeed|henceforth|hereby|wherein)\b',
-                r'\b(as an ai|as a language model|as an artificial)\b',
-                r'\b(in summary|in conclusion|to summarize)\b',
-                r'\b(dear reader|valued audience|esteemed followers)\b'
-            ]
-            for phrase in ai_phrases:
-                text = re.sub(phrase, '', text, flags=re.IGNORECASE)
-            
-            text = re.sub(r'\b(reddit|subreddit|r/\w+)\b', '', text, flags=re.IGNORECASE)
-            text = re.sub(r'\b(I|me|my|we|our|us)\b', '', text, flags=re.IGNORECASE)
-            
-            # Clean up extra spaces and newlines
-            text = re.sub(r'\s+', ' ', text)
-            text = re.sub(r'\n\s*\n+', '\n', text)
-            
-            # Ensure it's exactly 1-2 lines
-            lines = [line.strip() for line in text.split('\n') if line.strip()]
-            if len(lines) > 2:
-                text = '\n'.join(lines[:2])
-            elif len(lines) == 1 and len(text) > 100:
-                # If one line is too long, split it naturally
-                words = text.split()
-                if len(words) > 15:
-                    mid = len(words) // 2
-                    text = ' '.join(words[:mid]) + '\n' + ' '.join(words[mid:])
-            
-            # ADD RANDOMIZED HASHTAGS (5-6 now)
-            dynamic_hashtags = get_random_hashtags()
-            final_tweet = text + "\n\n" + dynamic_hashtags
-
-            if len(final_tweet) > 280:
-                # Trim the text part, not the hashtags
-                text_max_len = 280 - len(dynamic_hashtags) - 3  # -3 for newlines
-                text = text[:text_max_len].rsplit(' ', 1)[0]  # Don't cut words
-                final_tweet = text + "\n\n" + dynamic_hashtags
-
-            print(f"✓ Successfully generated tweet ({len(final_tweet)} chars)")
-            print(f"   Hashtags: {dynamic_hashtags}")
-            return final_tweet, None
-
-        except Exception as e:
-            print(f"✗ AI generation failed: {e}")
-            if attempt < min(max_entry_tries - 1, len(entries) - 1):
-                time.sleep(1)
-            continue
+            text = clean_ai_text(text)
+            if text and len(text) > 20:
+                hashtags = get_hashtags_for_persona(persona_name)
+                final_tweet = format_tweet(text, hashtags)
+                posted_links.add(entry['link'])
+                return final_tweet, persona_name
+                
+    except Exception as e:
+        print(f"  Generation error: {e}")
     
-    print("\n❌ Failed to generate tweet from all attempted entries.")
+    return None, None
+
+def clean_ai_text(text):
+    text = text.strip()
+    text = re.sub(r'\*\*|\*|__|_', '', text)
+    ai_phrases = [r'\b(behold|thus|indeed|henceforth|hereby|wherein)\b',
+                  r'\b(as an ai|as a language model|as an artificial)\b',
+                  r'\b(in summary|in conclusion|to summarize)\b']
+    for phrase in ai_phrases:
+        text = re.sub(phrase, '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\b(reddit|subreddit|r/\w+)\b', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\b(I|me|my|we|our|us)\b', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\s+', ' ', text)
+    text = re.sub(r'\n\s*\n+', '\n', text)
+    
+    # Ensure 1-2 lines
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
+    if len(lines) > 2:
+        text = '\n'.join(lines[:2])
+    elif len(lines) == 1 and len(text) > 100:
+        words = text.split()
+        if len(words) > 15:
+            mid = len(words) // 2
+            text = ' '.join(words[:mid]) + '\n' + ' '.join(words[mid:])
+    
+    return text
+
+def format_tweet(text, hashtags):
+    tweet = text + "\n\n" + hashtags
+    if len(tweet) > 280:
+        text_max = 280 - len(hashtags) - 3
+        text = text[:text_max].rsplit(' ', 1)[0]
+        tweet = text + "\n\n" + hashtags
+    return tweet
+
+# =============================
+# MAIN GENERATION WITH FALLBACK SYSTEM
+# =============================
+def generate_tweet():
+    print("\n📊 Fetching content...")
+    entries = parse_reddit_rss()
+    
+    if not entries:
+        print("❌ No content found")
+        return None, None
+    
+    print(f"✓ Found {len(entries)} total entries")
+    
+    # STRATEGY 1: Try original random persona first
+    original_persona = random.choice(list(CONTENT_TYPES.keys()))
+    print(f"\n🎯 Strategy 1: Trying original persona - {original_persona}")
+    
+    tweet, used_persona = generate_with_persona(original_persona, entries, attempt_adaptation=True)
+    
+    if tweet:
+        print(f"  ✅ Success with {used_persona}")
+        return tweet, used_persona
+    
+    # STRATEGY 2: Try flexible personas (can adapt any content)
+    print(f"\n🔄 Strategy 2: Trying flexible personas...")
+    for persona_name in FLEXIBLE_PERSONAS:
+        if persona_name == original_persona:
+            continue
+            
+        print(f"  Trying {persona_name}...")
+        tweet, used_persona = generate_with_persona(persona_name, entries, attempt_adaptation=True)
+        
+        if tweet:
+            print(f"    ✅ Adapted content for {used_persona}")
+            return tweet, used_persona
+    
+    # STRATEGY 3: Last resort - general fan perspective
+    print(f"\n⚡ Strategy 3: Using general fan perspective...")
+    general_prompt = (
+        f"Write a short 2-line tweet about football/soccer. "
+        f"Sound like a real fan chatting casually. Use natural language. "
+        f"Topic ideas: matchday feelings, fan experiences, or general football talk."
+    )
+    
+    try:
+        response = client.models.generate_content(model=MODEL_NAME, contents=general_prompt)
+        if response and response.candidates:
+            text = ""
+            for part in response.candidates[0].content.parts:
+                if hasattr(part, "text") and part.text:
+                    text += part.text
+            
+            text = clean_ai_text(text)
+            if text:
+                hashtags = get_hashtags_for_persona("fan_philosopher")
+                tweet = format_tweet(text, hashtags)
+                print(f"  ✅ Created general fan tweet")
+                return tweet, "fan_philosopher"
+    except Exception as e:
+        print(f"  General generation failed: {e}")
+    
+    print("\n❌ All generation strategies failed")
     return None, None
 
 # =============================
-# MAIN EXECUTION FUNCTION
+# MAIN EXECUTION
 # =============================
-
 def main():
     print("=" * 50)
-    print("⚽ Soccer Content Bot - Natural Human Edition")
+    print("⚽ Smart Soccer Bot - Adaptive Persona System")
     print("=" * 50)
-
+    
     # Check credentials
-    credentials = {
-        'TWITTER_API_KEY': TWITTER_API_KEY,
-        'TWITTER_API_SECRET': TWITTER_API_SECRET,
-        'TWITTER_ACCESS_TOKEN': TWITTER_ACCESS_TOKEN,
-        'TWITTER_ACCESS_TOKEN_SECRET': TWITTER_ACCESS_TOKEN_SECRET,
-        'GEMINI_API_KEY': GEMINI_API_KEY
-    }
-    
-    missing = [key for key, value in credentials.items() if not value]
-    if missing:
-        print("❌ Missing credentials:")
-        for m in missing:
-            print(f"   - {m}")
+    required = [TWITTER_API_KEY, TWITTER_API_SECRET, 
+                TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET, GEMINI_API_KEY]
+    if not all(required):
+        print("❌ Missing credentials")
         return
-
-    print("✓ All credentials present")
-    print(f"✓ Using {len(REDDIT_RSS_FEEDS)} soccer RSS feeds")
-    print(f"✓ Hashtag pool: {len(TOP_SOCCER_HASHTAGS)} natural tags")
-    print("✓ Writing style: Natural human conversation")
-    print("✓ Tweet length: 2 lines maximum")
-    print("✓ Hashtags: 5-6 per tweet")
-    print("\n🚀 Starting content generation...")
-
-    post_text, _ = generate_engaging_post()
     
-    if not post_text:
-        print("\n❌ Failed to generate a tweet after all retries. Skipping post.")
+    print("✓ All systems ready")
+    print(f"✓ Persona flexibility: {len(FLEXIBLE_PERSONAS)} flexible, {len(SPECIFIC_PERSONAS)} specific")
+    print(f"✓ Fallback system: 3-tier strategy")
+    
+    tweet, persona = generate_tweet()
+    
+    if not tweet:
+        print("\n❌ Could not generate tweet")
         return
-
+    
     print(f"\n" + "=" * 50)
-    print("FINAL TWEET:")
+    print(f"FINAL TWEET ({persona}):")
     print("=" * 50)
-    print(post_text)
+    print(tweet)
     print("=" * 50)
-    print(f"Length: {len(post_text)} characters")
+    print(f"Length: {len(tweet)} chars")
     print("=" * 50)
-
+    
     print("\n📤 Posting to Twitter...")
-    success = post_to_twitter(
-        post_text,
-        TWITTER_API_KEY,
-        TWITTER_API_SECRET,
-        TWITTER_ACCESS_TOKEN,
-        TWITTER_ACCESS_TOKEN_SECRET
-    )
-
-    if success:
-        print("\n✅ Successfully posted to Twitter!")
+    if post_to_twitter(tweet):
+        print("✅ Posted successfully!")
     else:
-        print("\n❌ Failed to post to Twitter.")
+        print("❌ Post failed")
 
 if __name__ == "__main__":
     main()
